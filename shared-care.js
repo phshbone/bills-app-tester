@@ -213,7 +213,14 @@
           result=await saveRemote(firstConnectMerged,result.version||0);
         }
       }
-      const shared=core.normalize(result.data||local);
+      // When this sync was initiated by a local edit, keep that edit authoritative
+      // even if the Worker response is based on an older/normalized copy. This
+      // prevents optimistic UI changes (focus buttons, profile edits, etc.) from
+      // flashing on and then being immediately replaced by stale remote state.
+      const responseShared=core.normalize(result.data||local);
+      const shared=localChanged&&!forcePull
+        ? core.merge(syncMeta.base,local,responseShared)
+        : responseShared;
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
       syncMeta={version:result.version||0,base:shared,updatedAt:result.updatedAt||null};

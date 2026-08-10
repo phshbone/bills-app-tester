@@ -1,5 +1,5 @@
-const CACHE_NAME = 'frannies-good-girl-v22';
-const APP_SHELL = ['./','./index.html','./styles.css?v=22','./app.js?v=22','./shared-care-core.js?v=3','./shared-care.js?v=3','./frannies-training-update.js?v=1','./manifest.json','./assets/frannie-background.webp','./assets/frannie-photo.webp','./assets/icon-192.png','./assets/icon-512.png'];
+const CACHE_NAME = 'frannies-good-girl-v23';
+const APP_SHELL = ['./','./index.html','./styles.css?v=23','./app.js?v=23','./shared-care-core.js?v=4','./shared-care.js?v=4','./frannies-training-update.js?v=1','./manifest.json','./assets/frannie-background.webp','./assets/frannie-photo.webp','./assets/icon-192.png','./assets/icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim()});
 self.addEventListener('fetch',event=>{

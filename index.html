@@ -69,7 +69,7 @@
 <div><label>Size</label><select id="dogSize"><option>Small</option><option selected>Medium</option><option>Large</option><option>Mountain creature</option></select></div>
 </div>
 <div style="margin-top:10px"><label>Frannie’s human</label><input value="Mollie" disabled style="opacity:.82"></div><div style="margin-top:10px"><label>Main goal</label><input id="mainGoal" value="Calmer behavior and better listening"></div>
-<div class="actions"><button id="profileSaveBtn" class="primary" onclick="saveProfile()">Save profile</button><button class="secondary" onclick="clearProfile()">Clear profile</button></div><div id="profileSaved" class="save-confirm hidden" role="status">✓ Frannie’s profile has been saved.</div>
+<div class="actions"><button id="profileSaveBtn" class="primary" onclick="saveProfile()">Save profile</button><button class="secondary" onclick="clearProfile()">Clear profile</button><button class="secondary" onclick="showScreen('care')">View Frannie’s Care</button></div><div id="profileSaved" class="save-confirm hidden" role="status">✓ Frannie’s profile has been saved.</div>
 </div>
 <div class="card">
 <h2>Foundation progress</h2>
@@ -204,8 +204,8 @@
 
 <nav class="bottom-nav" style="grid-template-columns:repeat(5,1fr)">
 <button class="nav active" onclick="showScreen('home',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Home</span></button>
-<button class="nav" onclick="showScreen('plan',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Plan</span></button>
 <button class="nav" onclick="showScreen('care',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Care</span></button>
+<button class="nav" onclick="showScreen('plan',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Plan</span></button>
 <button class="nav" onclick="showScreen('log',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Frannie Log</span></button>
 <button class="nav" onclick="showScreen('safety',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Safety</span></button></nav>
 
@@ -216,9 +216,9 @@
 <div class="modal-fallback">The video is streamed from YouTube. If the uploader blocks embedded playback, <a id="youtubeFallback" target="_blank" rel="noopener">open the official video on YouTube</a>.</div>
 </div></div>
 
-<script src="app.js?v=22" defer></script>
-<script src="shared-care-core.js?v=3" defer></script>
-<script src="shared-care.js?v=3" defer></script>
+<script src="app.js?v=23" defer></script>
+<script src="shared-care-core.js?v=4" defer></script>
+<script src="shared-care.js?v=4" defer></script>
 <script src="frannies-training-update.js?v=1" defer></script>
 <section id="printReport" class="print-only"></section></body>
 </html>
