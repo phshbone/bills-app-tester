@@ -1,32 +1,42 @@
 (function(root){
   "use strict";
 
-  const ARRAY_FIELDS=["treatments","treatmentHistory","careHistory","allergies","weights","heights","careNotes","feedingItems","feedingHistory"];
-  const SITTER_FIELDS=["pottyRoutine","crateSleep","emergencyVet","instructions"];
+  const OBJECT_ARRAY_FIELDS=["logs","treatments","treatmentHistory","careHistory","allergies","weights","heights","careNotes","feedingItems","feedingHistory","activityLog"];
+  const PRIMITIVE_ARRAY_FIELDS=["selected","completed"];
+  const ARRAY_FIELDS=[...PRIMITIVE_ARRAY_FIELDS,...OBJECT_ARRAY_FIELDS];
+  const SITTER_TEXT_FIELDS=["pottyRoutine","crateSleep","emergencyVet","instructions","activatedAt","activatedBy"];
+  const SITTER_FIELDS=[...SITTER_TEXT_FIELDS,"active"];
 
   function isObject(value){return Boolean(value)&&typeof value==="object"&&!Array.isArray(value)}
   function text(value){return typeof value==="string"?value:""}
-  function cloneArray(value){return Array.isArray(value)?value.filter(isObject).map(item=>({...item})):[]}
+  function cloneObjectArray(value){return Array.isArray(value)?value.filter(isObject).map(item=>({...item})):[]}
+  function clonePrimitiveArray(value){return Array.isArray(value)?value.filter(item=>typeof item==="string"||typeof item==="number"||typeof item==="boolean"):[]}
 
   function normalize(raw){
     const value=isObject(raw)?raw:{};
     const profile=isObject(value.profile)?{
       name:text(value.profile.name)||"Frannie",
       age:text(value.profile.age),
-      size:text(value.profile.size)||"Medium"
+      size:text(value.profile.size)||"Medium",
+      goal:text(value.profile.goal)
     }:null;
     const sitter={};
-    SITTER_FIELDS.forEach(field=>{sitter[field]=isObject(value.sitter)?text(value.sitter[field]):""});
-    const result={schemaVersion:Number.isInteger(value.schemaVersion)?value.schemaVersion:1,profile,sitter};
-    ARRAY_FIELDS.forEach(field=>{result[field]=cloneArray(value[field])});
+    SITTER_TEXT_FIELDS.forEach(field=>{sitter[field]=isObject(value.sitter)?text(value.sitter[field]):""});
+    sitter.active=Boolean(isObject(value.sitter)&&value.sitter.active);
+    const result={schemaVersion:Number.isInteger(value.schemaVersion)?value.schemaVersion:3,profile,sitter};
+    PRIMITIVE_ARRAY_FIELDS.forEach(field=>{result[field]=clonePrimitiveArray(value[field])});
+    OBJECT_ARRAY_FIELDS.forEach(field=>{result[field]=cloneObjectArray(value[field])});
     return result;
   }
 
   function extract(appState){
     const source=isObject(appState)?appState:{};
     return normalize({
-      schemaVersion:1,
-      profile:source.profile?{name:source.profile.name,age:source.profile.age,size:source.profile.size}:null,
+      schemaVersion:3,
+      profile:source.profile?{name:source.profile.name,age:source.profile.age,size:source.profile.size,goal:source.profile.goal}:null,
+      selected:source.selected,
+      completed:source.completed,
+      logs:source.logs,
       sitter:source.sitter,
       treatments:source.treatments,
       treatmentHistory:source.treatmentHistory,
@@ -36,7 +46,8 @@
       heights:source.heights,
       careNotes:source.careNotes,
       feedingItems:source.feedingItems,
-      feedingHistory:source.feedingHistory
+      feedingHistory:source.feedingHistory,
+      activityLog:source.activityLog
     });
   }
 
@@ -52,11 +63,11 @@
 
   function mergeProfile(base,local,remote){
     if(local===null&&base!==null)return null;
-    return mergeObject(base,local,remote,["name","age","size"]);
+    return mergeObject(base,local,remote,["name","age","size","goal"]);
   }
 
   function mergeArray(base,local,remote){
-    const baseItems=cloneArray(base),localItems=cloneArray(local),remoteItems=cloneArray(remote);
+    const baseItems=cloneObjectArray(base),localItems=cloneObjectArray(local),remoteItems=cloneObjectArray(remote);
     const baseById=new Map(baseItems.map(item=>[item.id,item]));
     const localById=new Map(localItems.map(item=>[item.id,item]));
     const remoteById=new Map(remoteItems.map(item=>[item.id,item]));
@@ -76,6 +87,14 @@
     ];
   }
 
+  function mergePrimitiveArray(base,local,remote){
+    const baseItems=clonePrimitiveArray(base),localItems=clonePrimitiveArray(local),remoteItems=clonePrimitiveArray(remote);
+    const result=new Set(remoteItems);
+    baseItems.forEach(item=>{if(!localItems.includes(item))result.delete(item)});
+    localItems.forEach(item=>{if(!baseItems.includes(item))result.add(item)});
+    return Array.from(result);
+  }
+
   function merge(baseValue,localValue,remoteValue){
     const base=normalize(baseValue),local=normalize(localValue),remote=normalize(remoteValue);
     const result={
@@ -83,9 +102,10 @@
       profile:mergeProfile(base.profile,local.profile,remote.profile),
       sitter:mergeObject(base.sitter,local.sitter,remote.sitter,SITTER_FIELDS)
     };
-    ARRAY_FIELDS.forEach(field=>{result[field]=mergeArray(base[field],local[field],remote[field])});
+    PRIMITIVE_ARRAY_FIELDS.forEach(field=>{result[field]=mergePrimitiveArray(base[field],local[field],remote[field])});
+    OBJECT_ARRAY_FIELDS.forEach(field=>{result[field]=mergeArray(base[field],local[field],remote[field])});
     return normalize(result);
   }
 
-  root.FrannieCareCore={ARRAY_FIELDS,SITTER_FIELDS,normalize,extract,merge,same};
+  root.FrannieCareCore={ARRAY_FIELDS,OBJECT_ARRAY_FIELDS,PRIMITIVE_ARRAY_FIELDS,SITTER_FIELDS,normalize,extract,merge,same};
 })(globalThis);

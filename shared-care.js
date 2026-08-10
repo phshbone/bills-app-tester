@@ -4,13 +4,135 @@
   const ENDPOINT="https://frannie-care.phshbone.workers.dev";
   const CONNECTION_KEY="frannieCareConnectionV1";
   const SYNC_KEY="frannieCareSyncV1";
+  const USER_KEY="frannieCareUserNameV1";
+  const MAX_ACTIVITY=100;
   const core=globalThis.FrannieCareCore;
   let connectionCode=localStorage.getItem(CONNECTION_KEY)||"";
   let syncMeta=loadSyncMeta();
+  let userName=(localStorage.getItem(USER_KEY)||"").trim();
   let syncTimer=null;
   let syncing=false;
   let syncAgain=false;
   let suppressSync=false;
+  let lastCareSnapshot=null;
+
+
+  const TRACKED_ARRAYS={
+    treatments:{label:"treatment / vaccination",name:item=>item?.name||item?.type||"item"},
+    feedingItems:{label:"food / treat",name:item=>item?.brand||item?.category||"item"},
+    allergies:{label:"allergy / caution",name:item=>item?.text||"item"},
+    weights:{label:"weight",name:item=>item?.value||"entry"},
+    heights:{label:"height",name:item=>item?.value||"entry"},
+    careNotes:{label:"care note",name:item=>item?.title||"note"},
+    logs:{label:"training log entry",name:item=>item?.lesson||"session"}
+  };
+
+  function careSnapshot(data=currentShared()){
+    const snap=core.normalize(data);
+    snap.activityLog=[];
+    return snap;
+  }
+
+  function describeArrayChange(before,after,config){
+    const prev=Array.isArray(before)?before:[],next=Array.isArray(after)?after:[];
+    const prevById=new Map(prev.filter(x=>x?.id).map(x=>[x.id,x]));
+    const nextById=new Map(next.filter(x=>x?.id).map(x=>[x.id,x]));
+    const added=next.filter(x=>x?.id&&!prevById.has(x.id));
+    const removed=prev.filter(x=>x?.id&&!nextById.has(x.id));
+    const changed=next.filter(x=>x?.id&&prevById.has(x.id)&&!core.same(x,prevById.get(x.id)));
+    const total=added.length+removed.length+changed.length;
+    if(!total)return null;
+    if(total>1)return `Updated ${config.label}s (${total} changes)`;
+    if(added.length)return `Added ${config.label}: ${config.name(added[0])}`;
+    if(removed.length)return `Removed ${config.label}: ${config.name(removed[0])}`;
+    return `Updated ${config.label}: ${config.name(changed[0])}`;
+  }
+
+  function describePrimitiveChanges(before,after,label){
+    const prev=Array.isArray(before)?before:[],next=Array.isArray(after)?after:[];
+    const added=next.filter(item=>!prev.includes(item));
+    const removed=prev.filter(item=>!next.includes(item));
+    if(!added.length&&!removed.length)return null;
+    const parts=[];
+    if(added.length)parts.push(`Added ${label}: ${added.join(", ")}`);
+    if(removed.length)parts.push(`Removed ${label}: ${removed.join(", ")}`);
+    return parts.join("; ");
+  }
+
+  function describeCareChange(before,after){
+    const changes=[];
+    if(!core.same(before?.profile,after?.profile)){
+      if(before?.profile&&!after?.profile)changes.push("Cleared Frannie’s profile");
+      else if(!before?.profile&&after?.profile)changes.push("Added Frannie’s profile");
+      else changes.push("Updated Frannie’s profile");
+    }
+    const focusChange=describePrimitiveChanges(before?.selected,after?.selected,"focus area");
+    if(focusChange)changes.push(focusChange);
+    const completedBefore=Array.isArray(before?.completed)?before.completed:[];
+    const completedAfter=Array.isArray(after?.completed)?after.completed:[];
+    const completedAdded=completedAfter.filter(item=>!completedBefore.includes(item));
+    const completedRemoved=completedBefore.filter(item=>!completedAfter.includes(item));
+    if(completedAdded.length)changes.push(`Marked ${completedAdded.length} training lesson${completedAdded.length===1?"":"s"} complete`);
+    if(completedRemoved.length)changes.push(`Unmarked ${completedRemoved.length} training lesson${completedRemoved.length===1?"":"s"}`);
+    const sitterBefore=before?.sitter||{},sitterAfter=after?.sitter||{};
+    if(Boolean(sitterBefore.active)!==Boolean(sitterAfter.active))changes.push(sitterAfter.active?"Activated sitter instructions":"Ended sitter instructions");
+    const sitterTextBefore={pottyRoutine:sitterBefore.pottyRoutine||"",crateSleep:sitterBefore.crateSleep||"",emergencyVet:sitterBefore.emergencyVet||"",instructions:sitterBefore.instructions||""};
+    const sitterTextAfter={pottyRoutine:sitterAfter.pottyRoutine||"",crateSleep:sitterAfter.crateSleep||"",emergencyVet:sitterAfter.emergencyVet||"",instructions:sitterAfter.instructions||""};
+    if(!core.same(sitterTextBefore,sitterTextAfter))changes.push(sitterAfter.active?"Updated active sitter instructions":"Saved sitter instruction draft");
+    Object.entries(TRACKED_ARRAYS).forEach(([field,config])=>{
+      const description=describeArrayChange(before?.[field],after?.[field],config);
+      if(description)changes.push(description);
+    });
+    const historyFields=[["treatmentHistory","treatment history"],["careHistory","care history"],["feedingHistory","feeding history"]];
+    historyFields.forEach(([field,label])=>{if(!core.same(before?.[field],after?.[field]))changes.push(`Updated ${label}`)});
+    if(!changes.length)return null;
+    return changes.length===1?changes[0]:changes.slice(0,4).join("; ")+(changes.length>4?` (+${changes.length-4} more)`:"");
+  }
+
+  function addActivity(action){
+    if(!action)return;
+    const entry={
+      id:(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2)),
+      at:new Date().toISOString(),
+      actor:userName||"Unknown device",
+      action:String(action).slice(0,300)
+    };
+    state.activityLog=[entry,...(Array.isArray(state.activityLog)?state.activityLog:[])].slice(0,MAX_ACTIVITY);
+    Store.save(state);
+    renderActivityLog();
+  }
+
+  function saveUserName(){
+    const input=document.getElementById("cloudCareUserName");
+    const name=(input?.value||"").trim();
+    if(!name){alert("Enter the name to use for changes from this device.");return}
+    userName=name.slice(0,60);
+    localStorage.setItem(USER_KEY,userName);
+    renderIdentityControls();
+    const saved=document.getElementById("cloudCareUserSaved");
+    saved?.classList.remove("hidden");
+    setTimeout(()=>saved?.classList.add("hidden"),2200);
+  }
+
+  function renderIdentityControls(){
+    const input=document.getElementById("cloudCareUserName");
+    const label=document.getElementById("cloudCareCurrentUser");
+    if(input&&document.activeElement!==input)input.value=userName;
+    if(label)label.textContent=userName?`Changes from this device will be marked as ${userName}.`:"Add your name so family changes show who made them.";
+  }
+
+  function renderActivityLog(){
+    const list=document.getElementById("cloudCareActivityList");
+    const empty=document.getElementById("cloudCareActivityEmpty");
+    if(!list)return;
+    const entries=Array.isArray(state.activityLog)?state.activityLog.slice(0,30):[];
+    list.innerHTML=entries.map(entry=>{
+      let when="";
+      try{when=new Date(entry.at).toLocaleString()}catch{}
+      return `<li><strong>${esc(entry.actor||"Unknown device")}</strong><span>${esc(entry.action||"Updated shared care")}</span><small>${esc(when||entry.at||"")}</small></li>`;
+    }).join("");
+    if(empty)empty.classList.toggle("hidden",entries.length>0);
+  }
 
   function loadSyncMeta(){
     try{
@@ -33,14 +155,16 @@
     const shared=core.normalize(data);
     suppressSync=true;
     try{
-      const localGoal=state.profile?.goal||"";
-      state.profile=shared.profile?{...state.profile,...shared.profile,goal:localGoal}:(localGoal?{name:"Frannie",age:"",size:"Medium",goal:localGoal}:null);
+      state.profile=shared.profile?{...shared.profile}:null;
       core.ARRAY_FIELDS.forEach(field=>{state[field]=shared[field]});
       state.sitter=shared.sitter;
       Store.save(state);
       initializeUI();
       fillSitterEditor();
       renderSitterView();
+      renderSitterBanner();
+      renderActivityLog();
+      lastCareSnapshot=careSnapshot(shared);
     }finally{suppressSync=false}
   }
 
@@ -72,7 +196,7 @@
     if(syncing){syncAgain=true;return}
     syncing=true;
     syncAgain=false;
-    status("Syncing shared care…","working");
+    status("Syncing Frannie’s shared record…","working");
     try{
       const local=currentShared();
       const localChanged=syncMeta.base&&!core.same(local,core.normalize(syncMeta.base));
@@ -83,8 +207,10 @@
         result=await fetchRemote();
         if(!result.data){
           result=await saveRemote(local,0);
-        }else if(!syncMeta.base&&hasSharedData(local)&&!hasSharedData(result.data)){
-          result=await saveRemote(local,result.version||0);
+        }else if(!syncMeta.base&&hasSharedData(local)){
+          const remote=core.normalize(result.data);
+          const firstConnectMerged=hasSharedData(remote)?core.merge({},local,remote):local;
+          result=await saveRemote(firstConnectMerged,result.version||0);
         }
       }
       const shared=core.normalize(result.data||local);
@@ -99,7 +225,7 @@
         status("Saving a newer care change…","working");
       }else{
         applyShared(shared);
-        status("Shared care is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
+        status("Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
       }
     }catch(error){
       console.warn("Frannie shared-care sync failed",error);
@@ -118,15 +244,28 @@
   }
 
   function onLocalPersist(){
+    const now=careSnapshot();
+    if(lastCareSnapshot===null)lastCareSnapshot=now;
+    else if(!core.same(now,lastCareSnapshot)){
+      const description=describeCareChange(lastCareSnapshot,now);
+      lastCareSnapshot=now;
+      addActivity(description);
+    }
     if(syncing)syncAgain=true;
     scheduleSync();
     renderSitterView();
+    renderSitterBanner();
   }
 
   async function connect(){
     const input=document.getElementById("cloudCareCode");
     const code=input?.value.trim()||"";
     if(!code){alert("Enter the family connection code.");return}
+    if(!userName){
+      const identity=(document.getElementById("cloudCareUserName")?.value||"").trim();
+      if(!identity){alert("Add your name for this device before connecting, so shared-care changes show who made them.");return}
+      userName=identity.slice(0,60);localStorage.setItem(USER_KEY,userName);
+    }
     connectionCode=code;
     localStorage.setItem(CONNECTION_KEY,code);
     syncMeta={version:0,base:null,updatedAt:null};
@@ -136,7 +275,7 @@
   }
 
   function disconnect(){
-    if(!confirm("Disconnect this device from Frannie’s shared care? The cached information will stay on this device."))return;
+    if(!confirm("Disconnect this device from Frannie’s shared record? The cached information will stay on this device."))return;
     connectionCode="";
     syncMeta={version:0,base:null,updatedAt:null};
     localStorage.removeItem(CONNECTION_KEY);
@@ -156,17 +295,56 @@
     if(disconnectButton)disconnectButton.classList.toggle("hidden",!connectionCode);
   }
 
-  function saveSitterInstructions(){
-    state.sitter={
+  function readSitterEditor(){
+    return {
       pottyRoutine:document.getElementById("sitterPotty")?.value.trim()||"",
       crateSleep:document.getElementById("sitterCrate")?.value.trim()||"",
       emergencyVet:document.getElementById("sitterEmergency")?.value.trim()||"",
       instructions:document.getElementById("sitterInstructions")?.value.trim()||""
     };
+  }
+
+  function saveSitterInstructions(){
+    const current=state.sitter||{};
+    state.sitter={...readSitterEditor(),active:Boolean(current.active),activatedAt:current.activatedAt||"",activatedBy:current.activatedBy||""};
     if(persist()){
-      renderSitterView();
+      renderSitterView();renderSitterBanner();
       const saved=document.getElementById("sitterSaved");saved?.classList.remove("hidden");setTimeout(()=>saved?.classList.add("hidden"),2600);
     }
+  }
+
+  function activateSitterInstructions(){
+    const draft=readSitterEditor();
+    if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
+    state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device"};
+    if(persist()){fillSitterEditor();renderSitterView();renderSitterBanner();openSitter()}
+  }
+
+  function endSitterInstructions(){
+    if(!state.sitter?.active)return;
+    if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
+    state.sitter={...state.sitter,active:false};
+    if(persist()){renderSitterBanner();renderSitterView()}
+  }
+
+  function renderSitterBanner(){
+    const banner=document.getElementById("sitterActiveBanner");
+    if(!banner)return;
+    const active=Boolean(state.sitter?.active);
+    banner.classList.toggle("hidden",!active);
+    if(active){
+      const meta=document.getElementById("sitterActiveMeta");
+      let detail="Tap to view current directions";
+      if(state.sitter?.activatedBy)detail=`Activated by ${state.sitter.activatedBy}`;
+      if(state.sitter?.activatedAt){
+        try{detail+=` · ${new Date(state.sitter.activatedAt).toLocaleString()}`}catch{}
+      }
+      if(meta)meta.textContent=detail;
+    }
+    const end=document.getElementById("endSitterInstructions");
+    if(end)end.classList.toggle("hidden",!active);
+    const activate=document.getElementById("activateSitterInstructions");
+    if(activate)activate.textContent=active?"Re-activate updated directions":"Activate sitter directions";
   }
 
   function fillSitterEditor(){
@@ -228,15 +406,24 @@
     const careGrid=careCard?.querySelector(".care-grid");
     if(!careCard||!careGrid||document.getElementById("cloudCarePanel"))return;
 
+    const home=document.getElementById("home");
+    if(home&&!document.getElementById("sitterActiveBanner")){
+      const banner=document.createElement("button");
+      banner.id="sitterActiveBanner";banner.type="button";banner.className="sitter-active-banner hidden";
+      banner.innerHTML=`<span class="sitter-paw" aria-hidden="true">🐾</span><span><strong>SITTER INSTRUCTIONS READY</strong><small id="sitterActiveMeta">Tap to view current directions</small></span><span class="sitter-paw" aria-hidden="true">🐾</span>`;
+      banner.addEventListener("click",openSitter);
+      home.prepend(banner);
+    }
+
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div><h3>Shared family care</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><div class="care-cloud-actions"><input id="cloudCareCode" type="password" autocomplete="off" autocapitalize="none" aria-label="Family connection code" placeholder="Enter family connection code"><button id="cloudCareConnect" class="primary" type="button">Connect</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><div class="care-cloud-actions"><input id="cloudCareCode" type="password" autocomplete="off" autocapitalize="none" aria-label="Family connection code" placeholder="Enter family connection code"><button id="cloudCareConnect" class="primary" type="button">Connect</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><div class="care-cloud-identity"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocomplete="name" placeholder="Mollie, Lisa, Bill, Sitter…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div><details class="care-activity"><summary>Recent shared changes</summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details>`;
     intro?.after(cloud);
 
     const editor=document.createElement("div");
     editor.className="care-section full";editor.id="sitterEditor";
-    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>These instructions combine with the current food, medication, and caution lists to make a simple caretaker view.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions"><button class="primary" id="saveSitterInstructions" type="button">Save sitter instructions</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instructions saved.</div>`;
+    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>Save directions as a shared draft while planning. When it is time for the sitter, activate them so everyone sees the Sitter Instructions Ready banner.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions"><button class="secondary" id="saveSitterInstructions" type="button">Save draft</button><button class="primary" id="activateSitterInstructions" type="button">Activate sitter directions</button><button class="secondary hidden" id="endSitterInstructions" type="button">End sitter directions</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instruction draft saved.</div>`;
     const timeline=Array.from(careGrid.children).find(item=>item.querySelector("h3")?.textContent.includes("Frannie timeline"));
     careGrid.insertBefore(editor,timeline||null);
 
@@ -246,16 +433,21 @@
     document.body.appendChild(modal);
 
     document.getElementById("cloudCareConnect").addEventListener("click",connect);
+    document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
+    document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
     document.getElementById("cloudCareSync").addEventListener("click",()=>synchronize());
     document.getElementById("cloudCareDisconnect").addEventListener("click",disconnect);
     document.getElementById("saveSitterInstructions").addEventListener("click",saveSitterInstructions);
+    document.getElementById("activateSitterInstructions").addEventListener("click",activateSitterInstructions);
+    document.getElementById("endSitterInstructions").addEventListener("click",endSitterInstructions);
     document.getElementById("openSitterView").addEventListener("click",openSitter);
     document.getElementById("closeSitterView").addEventListener("click",closeSitter);
     document.getElementById("sitterChecklistToggle").addEventListener("change",renderSitterView);
     document.getElementById("shareSitterView").addEventListener("click",shareSitter);
     document.getElementById("printSitterView").addEventListener("click",printSitter);
     modal.addEventListener("click",event=>{if(event.target===modal)closeSitter()});
-    renderConnectionControls();fillSitterEditor();renderSitterView();
+    renderConnectionControls();renderIdentityControls();fillSitterEditor();renderSitterView();renderSitterBanner();renderActivityLog();
+    lastCareSnapshot=careSnapshot();
     if(connectionCode)synchronize();
   }
 

@@ -26,7 +26,7 @@ const STORAGE_VERSION=6;
 const $=id=>document.getElementById(id);
 
 function defaultState(){
-  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:""}};
+  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""}};
 }
 function normalizeState(raw){
   const base=defaultState();
@@ -46,7 +46,7 @@ function normalizeState(raw){
     weights:Array.isArray(raw.weights)?raw.weights:[],
     heights:Array.isArray(raw.heights)?raw.heights:[],
     careNotes:Array.isArray(raw.careNotes)?raw.careNotes:[],
-    sitter:raw.sitter&&typeof raw.sitter==="object"?raw.sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:""},
+    sitter:raw.sitter&&typeof raw.sitter==="object"?raw.sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""},
     feeding:null,
     feedingItems:Array.isArray(raw.feedingItems)?raw.feedingItems:(raw.feeding&&typeof raw.feeding==="object"?[{
       id:raw.feeding.id||"feeding-legacy",
@@ -57,7 +57,8 @@ function normalizeState(raw){
       note:raw.feeding.note||"",
       addedAt:raw.feeding.updatedAt||todayISO()
     }]:[]),
-    feedingHistory:Array.isArray(raw.feedingHistory)?raw.feedingHistory:[]
+    feedingHistory:Array.isArray(raw.feedingHistory)?raw.feedingHistory:[],
+    activityLog:Array.isArray(raw.activityLog)?raw.activityLog:[]
   };
 }
 const Store={
@@ -96,7 +97,7 @@ function hasMeaningfulData(value=state){
     value.profile || value.feeding || value.feedingItems?.length ||
     value.selected?.length || value.completed?.length || value.logs?.length ||
     value.treatments?.length || value.treatmentHistory?.length || value.careHistory?.length || value.allergies?.length ||
-    value.weights?.length || value.heights?.length || value.careNotes?.length || value.feedingHistory?.length ||
+    value.weights?.length || value.heights?.length || value.careNotes?.length || value.feedingHistory?.length || value.activityLog?.length ||
     Object.values(value.sitter||{}).some(Boolean)
   );
 }
