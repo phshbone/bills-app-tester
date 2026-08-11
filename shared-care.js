@@ -64,7 +64,12 @@
     if(!core.same(before?.profile,after?.profile)){
       if(before?.profile&&!after?.profile)changes.push("Cleared Frannie’s profile");
       else if(!before?.profile&&after?.profile)changes.push("Added Frannie’s profile");
-      else changes.push("Updated Frannie’s profile");
+      else {
+        const fields=[];
+        const labels={name:"name",age:"age",size:"size",goal:"training goal"};
+        Object.keys(labels).forEach(key=>{if(!core.same(before?.profile?.[key],after?.profile?.[key]))fields.push(labels[key])});
+        changes.push(fields.length?`Updated Frannie’s profile: ${fields.join(", ")}`:"Updated Frannie’s profile");
+      }
     }
     const focusChange=describePrimitiveChanges(before?.selected,after?.selected,"focus area");
     if(focusChange)changes.push(focusChange);
@@ -117,8 +122,21 @@
   function renderIdentityControls(){
     const input=document.getElementById("cloudCareUserName");
     const label=document.getElementById("cloudCareCurrentUser");
+    const editor=document.getElementById("cloudCareIdentityEditor");
+    const compact=document.getElementById("cloudCareIdentityCompact");
+    const compactName=document.getElementById("cloudCareIdentityName");
     if(input&&document.activeElement!==input)input.value=userName;
     if(label)label.textContent=userName?`Changes from this device will be marked as ${userName}.`:"Add your name so family changes show who made them.";
+    if(compactName)compactName.textContent=userName||"Not set";
+    if(editor)editor.classList.toggle("hidden",Boolean(userName));
+    if(compact)compact.classList.toggle("hidden",!userName);
+  }
+
+  function editUserName(){
+    document.getElementById("cloudCareIdentityEditor")?.classList.remove("hidden");
+    document.getElementById("cloudCareIdentityCompact")?.classList.add("hidden");
+    const input=document.getElementById("cloudCareUserName");
+    if(input){input.value=userName;input.focus();input.select()}
   }
 
   function renderActivityLog(){
@@ -218,9 +236,18 @@
       // prevents optimistic UI changes (focus buttons, profile edits, etc.) from
       // flashing on and then being immediately replaced by stale remote state.
       const responseShared=core.normalize(result.data||local);
-      const shared=localChanged&&!forcePull
+      let shared=localChanged&&!forcePull
         ? core.merge(syncMeta.base,local,responseShared)
         : responseShared;
+      // Primitive selection arrays are user intent, not server-generated data.
+      // If this device changed one during the current save, preserve the exact
+      // local array so selecting a second focus cannot erase the first.
+      if(localChanged&&!forcePull){
+        const base=core.normalize(syncMeta.base);
+        core.PRIMITIVE_ARRAY_FIELDS.forEach(field=>{
+          if(!core.same(local[field],base[field]))shared[field]=Array.isArray(local[field])?[...local[field]]:[];
+        });
+      }
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
       syncMeta={version:result.version||0,base:shared,updatedAt:result.updatedAt||null};
@@ -425,7 +452,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><div class="care-cloud-actions"><input id="cloudCareCode" type="password" autocomplete="off" autocapitalize="none" aria-label="Family connection code" placeholder="Enter family connection code"><button id="cloudCareConnect" class="primary" type="button">Connect</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><div class="care-cloud-identity"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocomplete="name" placeholder="Mollie, Lisa, Bill, Sitter…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div><details class="care-activity"><summary>Recent shared changes</summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><div class="care-cloud-actions"><input id="cloudCareCode" type="password" autocomplete="off" autocapitalize="none" aria-label="Family connection code" placeholder="Enter family connection code"><button id="cloudCareConnect" class="primary" type="button">Connect</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocomplete="name" placeholder="Mollie, Brett, Michelle, Bill…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details>`;
     intro?.after(cloud);
 
     const editor=document.createElement("div");
@@ -441,6 +468,7 @@
 
     document.getElementById("cloudCareConnect").addEventListener("click",connect);
     document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
+    document.getElementById("cloudCareChangeUser").addEventListener("click",editUserName);
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
     document.getElementById("cloudCareSync").addEventListener("click",()=>synchronize());
     document.getElementById("cloudCareDisconnect").addEventListener("click",disconnect);
