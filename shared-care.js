@@ -16,6 +16,7 @@
   let suppressSync=false;
   let lastCareSnapshot=null;
   let sitterEntryAlertShown=false;
+  let sitterActiveIntent=null;
 
 
   const TRACKED_ARRAYS={
@@ -258,12 +259,22 @@
           if(!core.same(local[field],base[field]))shared[field]=Array.isArray(local[field])?[...local[field]]:[];
         });
       }
+      // Sitter activation/deactivation is an explicit user intent. Never allow a
+      // stale sync response to reverse it while the write is in flight.
+      if(sitterActiveIntent!==null){
+        shared.sitter={...(shared.sitter||{}),active:sitterActiveIntent};
+        if(sitterActiveIntent){
+          shared.sitter.activatedAt=state.sitter?.activatedAt||shared.sitter.activatedAt||new Date().toISOString();
+          shared.sitter.activatedBy=state.sitter?.activatedBy||shared.sitter.activatedBy||userName||"Unknown device";
+        }
+      }
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
       syncMeta={version:result.version||0,base:shared,updatedAt:result.updatedAt||null};
       saveSyncMeta();
       if(changedDuringSync){
         const preserved=core.merge(local,newestLocal,shared);
+        if(sitterActiveIntent!==null)preserved.sitter={...(preserved.sitter||{}),active:sitterActiveIntent};
         applyShared(preserved);
         syncAgain=true;
         status("Saving a newer care change…","working");
@@ -271,6 +282,12 @@
         applyShared(shared);
         status("Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
       }
+      if(sitterActiveIntent!==null && Boolean(core.normalize(result.data||{}).sitter?.active)===sitterActiveIntent){
+        sitterActiveIntent=null;
+      } else if(sitterActiveIntent!==null){
+        syncAgain=true;
+      }
+      if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,60);
     }catch(error){
       console.warn("Frannie shared-care sync failed",error);
       status(error.status===401?"Connection code not accepted":"Offline — changes are safe on this device and will retry","error");
@@ -361,6 +378,7 @@
     const draft=readSitterEditor();
     if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
     state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device"};
+    sitterActiveIntent=true;
     sitterEntryAlertShown=false;
     if(persist()){
       fillSitterEditor();renderSitterView();renderSitterBanner();
@@ -373,6 +391,9 @@
     if(!state.sitter?.active)return;
     if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
     state.sitter={...state.sitter,active:false};
+    sitterActiveIntent=false;
+    document.getElementById("sitterEntryAlert")?.classList.remove("open");
+    document.body.style.overflow="";
     if(persist()){renderSitterBanner();renderSitterView()}
   }
 
@@ -417,8 +438,8 @@
       if(meta)meta.textContent=detail;
       setTimeout(showSitterEntryAlert,120);
     }else{
-      sitterEntryAlertShown=false;
-      document.getElementById("sitterEntryAlert")?.classList.remove("open");
+      // Do not auto-dismiss the entry alert during ordinary renders/syncs.
+      // Only an explicit End sitter directions action may turn the mode off.
     }
     const end=document.getElementById("endSitterInstructions");
     if(end)end.classList.toggle("hidden",!active);
