@@ -7,9 +7,25 @@
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
   const core=globalThis.FrannieCareCore;
+
+  function setupCodeFromUrl(){
+    try{
+      const url=new URL(location.href);
+      const code=(url.searchParams.get("connect")||"").trim();
+      if(!code)return "";
+      url.searchParams.delete("connect");
+      history.replaceState(null,"",url.pathname+url.search+url.hash);
+      return code;
+    }catch{return ""}
+  }
+
+  const provisionedCode=setupCodeFromUrl();
+  if(provisionedCode)localStorage.setItem(CONNECTION_KEY,provisionedCode);
+
   let connectionCode=localStorage.getItem(CONNECTION_KEY)||"";
   let syncMeta=loadSyncMeta();
   let userName=(localStorage.getItem(USER_KEY)||"").trim();
+  let needsIdentitySetup=Boolean(provisionedCode&&!userName);
   let syncTimer=null;
   let syncing=false;
   let syncAgain=false;
@@ -17,7 +33,6 @@
   let lastCareSnapshot=null;
   let sitterDismissedThisForeground=false;
   let sitterActiveIntent=null;
-
 
   const TRACKED_ARRAYS={
     treatments:{label:"treatment / vaccination",name:item=>item?.name||item?.type||"item"},
@@ -28,6 +43,16 @@
     careNotes:{label:"care note",name:item=>item?.title||"note"},
     logs:{label:"training log entry",name:item=>item?.lesson||"session"}
   };
+
+  function sameActor(left,right){
+    return String(left||"").trim().toLocaleLowerCase()===String(right||"").trim().toLocaleLowerCase();
+  }
+
+  function canEndSitter(){
+    if(!state.sitter?.active)return false;
+    const owner=(state.sitter?.activatedBy||"").trim();
+    return !owner||sameActor(owner,userName);
+  }
 
   function careSnapshot(data=currentShared()){
     const snap=core.normalize(data);
@@ -116,6 +141,7 @@
     userName=name.slice(0,60);
     localStorage.setItem(USER_KEY,userName);
     renderIdentityControls();
+    renderSitterBanner();
     const saved=document.getElementById("cloudCareUserSaved");
     saved?.classList.remove("hidden");
     setTimeout(()=>saved?.classList.add("hidden"),2200);
@@ -244,25 +270,16 @@
           result=await saveRemote(firstConnectMerged,result.version||0);
         }
       }
-      // When this sync was initiated by a local edit, keep that edit authoritative
-      // even if the Worker response is based on an older/normalized copy. This
-      // prevents optimistic UI changes (focus buttons, profile edits, etc.) from
-      // flashing on and then being immediately replaced by stale remote state.
       const responseShared=core.normalize(result.data||local);
       let shared=localChanged&&!forcePull
         ? core.merge(syncMeta.base,local,responseShared)
         : responseShared;
-      // Primitive selection arrays are user intent, not server-generated data.
-      // If this device changed one during the current save, preserve the exact
-      // local array so selecting a second focus cannot erase the first.
       if(localChanged&&!forcePull){
         const base=core.normalize(syncMeta.base);
         core.PRIMITIVE_ARRAY_FIELDS.forEach(field=>{
           if(!core.same(local[field],base[field]))shared[field]=Array.isArray(local[field])?[...local[field]]:[];
         });
       }
-      // Sitter activation/deactivation is an explicit user intent. Never allow a
-      // stale sync response to reverse it while the write is in flight.
       if(sitterActiveIntent!==null){
         shared.sitter={...(shared.sitter||{}),active:sitterActiveIntent};
         if(sitterActiveIntent){
@@ -307,10 +324,7 @@
   }
 
   let pendingExplicitActivity=null;
-
-  function setNextActivity(action){
-    pendingExplicitActivity=String(action||"").trim()||null;
-  }
+  function setNextActivity(action){pendingExplicitActivity=String(action||"").trim()||null}
 
   function onLocalPersist(){
     const now=careSnapshot();
@@ -334,18 +348,20 @@
 
   async function connect(suppliedCode=""){
     const input=document.getElementById("cloudCareCode");
-    const code=(suppliedCode||input?.value||"").trim();
-    if(!code){alert("Enter the family connection code.");return}
+    const code=(suppliedCode||input?.value||connectionCode||"").trim();
+    if(!code){alert("Open the Frannie family setup link on this device first.");return}
     if(!userName){
       const identity=(document.getElementById("cloudCareUserName")?.value||"").trim();
-      if(!identity){alert("Add your name for this device before connecting, so shared-care changes show who made them.");return}
+      if(!identity){alert("Add your name or initials before connecting.");return}
       userName=identity.slice(0,60);localStorage.setItem(USER_KEY,userName);
     }
     connectionCode=code;
     localStorage.setItem(CONNECTION_KEY,code);
     syncMeta={version:0,base:null,updatedAt:null};
     saveSyncMeta();
+    needsIdentitySetup=false;
     renderConnectionControls();
+    renderIdentityControls();
     await synchronize({forcePull:true});
   }
 
@@ -359,14 +375,33 @@
     status("Not connected — care stays on this device only","neutral");
   }
 
+  async function shareSetupLink(){
+    if(!connectionCode){alert("This device is not connected to Frannie yet.");return}
+    const url=new URL(location.href);
+    url.search="";
+    url.hash="";
+    url.searchParams.set("connect",connectionCode);
+    const text=url.toString();
+    if(navigator.share){
+      try{
+        await navigator.share({title:"Connect to Frannie",text:"Open this once on the device you want to connect to Frannie.",url:text});
+        return;
+      }catch(error){if(error?.name==="AbortError")return}
+    }
+    try{await navigator.clipboard.writeText(text);alert("Frannie’s one-time setup link was copied. Send it privately to the family member who needs to connect a device.")}
+    catch{prompt("Copy this Frannie setup link:",text)}
+  }
+
   function renderConnectionControls(){
     const connectButton=document.getElementById("cloudCareConnect");
     const syncButton=document.getElementById("cloudCareSync");
     const disconnectButton=document.getElementById("cloudCareDisconnect");
+    const setupButton=document.getElementById("cloudCareShareSetup");
     const badge=document.getElementById("cloudCareUserBadge");
     if(connectButton)connectButton.classList.toggle("hidden",Boolean(connectionCode));
     if(syncButton)syncButton.classList.toggle("hidden",!connectionCode);
     if(disconnectButton)disconnectButton.classList.toggle("hidden",!connectionCode);
+    if(setupButton)setupButton.classList.toggle("hidden",!connectionCode);
     if(badge){
       badge.textContent=userName||"";
       badge.classList.toggle("hidden",!connectionCode||!userName);
@@ -392,6 +427,10 @@
   }
 
   async function activateSitterInstructions(){
+    if(state.sitter?.active&&!canEndSitter()){
+      alert(`Sitter mode is already controlled by ${state.sitter?.activatedBy||"the person who activated it"}. You can view the directions, but only that person can update or end the active mode.`);
+      return;
+    }
     const draft=readSitterEditor();
     if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
     state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device"};
@@ -404,14 +443,21 @@
     }
   }
 
-  function endSitterInstructions(){
+  async function endSitterInstructions(){
     if(!state.sitter?.active)return;
+    if(!canEndSitter()){
+      alert(`Only ${state.sitter?.activatedBy||"the person who activated sitter mode"} can end these sitter directions.`);
+      return;
+    }
     if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
     state.sitter={...state.sitter,active:false};
     sitterActiveIntent=false;
     document.getElementById("sitterEntryAlert")?.classList.remove("open");
     document.body.style.overflow="";
-    if(persist()){renderSitterBanner();renderSitterView()}
+    if(persist()){
+      renderSitterBanner();renderSitterView();
+      if(connectionCode)await synchronize();
+    }
   }
 
   function splashDismissed(){
@@ -454,14 +500,22 @@
       }
       if(meta)meta.textContent=detail;
       setTimeout(showSitterEntryAlert,120);
-    }else{
-      // Do not auto-dismiss the entry alert during ordinary renders/syncs.
-      // Only an explicit End sitter directions action may turn the mode off.
     }
     const end=document.getElementById("endSitterInstructions");
-    if(end)end.classList.toggle("hidden",!active);
+    if(end){
+      end.classList.toggle("hidden",!active);
+      const allowed=canEndSitter();
+      end.disabled=active&&!allowed;
+      end.textContent=active&&!allowed?`Only ${state.sitter?.activatedBy||"activator"} can end`:"End sitter directions";
+      end.title=active&&!allowed?`Sitter mode was activated by ${state.sitter?.activatedBy||"another family member"}.`:"";
+    }
     const activate=document.getElementById("activateSitterInstructions");
-    if(activate)activate.textContent=active?"Re-activate updated directions":"Activate sitter directions";
+    if(activate){
+      const allowed=!active||canEndSitter();
+      activate.disabled=!allowed;
+      activate.textContent=active&&!allowed?`Controlled by ${state.sitter?.activatedBy||"activator"}`:(active?"Re-activate updated directions":"Activate sitter directions");
+      activate.title=active&&!allowed?`Only ${state.sitter?.activatedBy||"the activator"} can change the active sitter mode.`:"";
+    }
   }
 
   function fillSitterEditor(){
@@ -535,7 +589,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Connect to Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" name="username" type="text" maxlength="60" autocomplete="username" autocapitalize="words" placeholder="Mollie, Brett, Michelle, Bill…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><p class="password-autofill-note">On iPhone, you can save your name/initials and Frannie connection code in Passwords for faster AutoFill next time.</p><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Connect to Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share setup link</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
     intro?.after(cloud);
 
     const jumpNav=document.createElement("nav");
@@ -555,19 +609,24 @@
       document.getElementById(button.dataset.careJump)?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
+    const scroller=document.querySelector(".app");
     const topButton=document.createElement("button");
     topButton.type="button";
     topButton.id="careTopButton";
     topButton.className="care-top-button hidden";
     topButton.textContent="↑ Top";
-    topButton.addEventListener("click",()=>document.getElementById("cloudCarePanel")?.scrollIntoView({behavior:"smooth",block:"start"}));
+    topButton.addEventListener("click",()=>{
+      if(scroller)scroller.scrollTo({top:0,behavior:"smooth"});
+      else document.getElementById("cloudCarePanel")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
     document.body.appendChild(topButton);
     const updateTopButton=()=>{
       const care=document.getElementById("care");
       const careActive=care?.classList.contains("active");
-      topButton.classList.toggle("hidden",!careActive||window.scrollY<650);
+      const y=scroller?scroller.scrollTop:window.scrollY;
+      topButton.classList.toggle("hidden",!careActive||y<650);
     };
-    window.addEventListener("scroll",updateTopButton,{passive:true});
+    (scroller||window).addEventListener("scroll",updateTopButton,{passive:true});
     document.addEventListener("click",()=>setTimeout(updateTopButton,30));
 
     const editor=document.createElement("div");
@@ -589,41 +648,39 @@
 
     const connectModal=document.createElement("div");
     connectModal.className="modal connection-setup-modal";connectModal.id="connectionSetupModal";
-    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p>Enter who is using this device and the family connection code. You only need to do this again if the device is disconnected.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" name="username" type="text" maxlength="60" autocomplete="username" autocapitalize="words" placeholder="Mollie, UB, Brett…"><label for="setupConnectionCode">Frannie connection code</label><input id="setupConnectionCode" name="password" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" placeholder="Connection code"><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
+    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p id="setupIntro">Type your name or initials. The family setup link supplies the connection automatically.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, UB, Brett…"><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect to Frannie</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
     document.body.appendChild(connectModal);
 
     const openConnectionSetup=()=>{
       const name=document.getElementById("setupUserName");
-      const code=document.getElementById("setupConnectionCode");
+      const intro=document.getElementById("setupIntro");
       if(name)name.value=userName||"";
-      if(code)code.value="";
+      if(intro)intro.textContent=connectionCode?"Type your name or initials. This device already has Frannie’s family connection.":"Open the Frannie family setup link on this device first, then type your name or initials.";
       connectModal.classList.add("open");
       document.body.style.overflow="hidden";
-      setTimeout(()=>{(userName?code:name)?.focus()},50);
+      setTimeout(()=>name?.focus(),50);
     };
     const closeConnectionSetup=()=>{connectModal.classList.remove("open");document.body.style.overflow=""};
     const connectFromSetup=async()=>{
       const name=(document.getElementById("setupUserName")?.value||"").trim();
-      const code=(document.getElementById("setupConnectionCode")?.value||"").trim();
       if(!name){alert("Add the name or initials for this device.");return}
-      if(!code){alert("Enter the family connection code.");return}
+      if(!connectionCode){alert("This device does not have Frannie’s connection yet. Open the family setup link first.");return}
       userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);
-      const hiddenCode=document.getElementById("cloudCareCode");
-      if(hiddenCode)hiddenCode.value=code;
       renderIdentityControls();
       closeConnectionSetup();
-      await connect(code);
+      await connect(connectionCode);
     };
 
     document.getElementById("cloudCareConnect").addEventListener("click",openConnectionSetup);
     document.getElementById("setupConnectButton").addEventListener("click",connectFromSetup);
     document.getElementById("setupCancelButton").addEventListener("click",closeConnectionSetup);
     connectModal.addEventListener("click",event=>{if(event.target===connectModal)closeConnectionSetup()});
-    document.getElementById("setupConnectionCode").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
+    document.getElementById("setupUserName").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
     document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
     document.getElementById("cloudCareChangeUser").addEventListener("click",editUserName);
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
     document.getElementById("cloudCareSync").addEventListener("click",()=>synchronize());
+    document.getElementById("cloudCareShareSetup").addEventListener("click",shareSetupLink);
     document.getElementById("cloudCareDisconnect").addEventListener("click",disconnect);
     document.getElementById("saveSitterInstructions").addEventListener("click",saveSitterInstructions);
     document.getElementById("activateSitterInstructions").addEventListener("click",activateSitterInstructions);
@@ -637,12 +694,18 @@
     modal.addEventListener("click",event=>{if(event.target===modal)closeSitter()});
     renderConnectionControls();renderIdentityControls();fillSitterEditor();renderSitterView();renderSitterBanner();renderActivityLog();
     lastCareSnapshot=careSnapshot();
-    if(connectionCode)synchronize();
-    else setTimeout(()=>{
-      const splash=document.getElementById("splashScreen");
-      const wait=()=>{if(!splash||splash.classList.contains("hide"))document.getElementById("cloudCareConnect")?.click();else setTimeout(wait,350)};
-      wait();
-    },250);
+
+    if(needsIdentitySetup){
+      setTimeout(()=>{
+        const splash=document.getElementById("splashScreen");
+        const wait=()=>{if(!splash||splash.classList.contains("hide"))openConnectionSetup();else setTimeout(wait,350)};
+        wait();
+      },250);
+    }else if(connectionCode&&userName){
+      synchronize();
+    }else if(!connectionCode){
+      status("Not connected — open the Frannie family setup link once on this device","neutral");
+    }
   }
 
   globalThis.FrannieCloudSync={onLocalPersist,synchronize,setNextActivity};
@@ -658,15 +721,15 @@
     entryRefreshRunning=true;
     sitterDismissedThisForeground=false;
     try{
-      if(connectionCode)await synchronize();
+      if(connectionCode&&userName)await synchronize();
     }finally{
       entryRefreshRunning=false;
       if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,140);
     }
   }
+
   window.addEventListener("pageshow",()=>refreshForAppEntry());
-  window.addEventListener("pagehide",()=>{sitterEntryAlertShown=false});
-  window.addEventListener("focus",()=>{if(document.visibilityState==="visible")refreshForAppEntry()});
+  window.addEventListener("pagehide",()=>{sitterDismissedThisForeground=false});
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="hidden")sitterDismissedThisForeground=false;
     else refreshForAppEntry();
