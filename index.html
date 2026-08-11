@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Frannie’s a Good Girl">
 <title>frannie</title>
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=26">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <script>
@@ -136,18 +136,22 @@
 <div class="actions"><button class="primary" onclick="showScreen('care')">Add care information</button><button class="secondary" onclick="showScreen('plan')">Open training plan</button></div>
 <div class="quick-log-entry"><h3>Quick log note</h3><div class="row-2"><div><label>Date</label><input id="quickLogDate" type="date"></div><div><label>Title</label><input id="quickLogTitle" placeholder="e.g. New behavior noticed"></div></div><div style="margin-top:9px"><label>Note</label><textarea id="quickLogText" placeholder="Add anything Mollie wants in Frannie Log."></textarea></div><div class="actions"><button class="primary" onclick="addQuickLogNote()">Add to Frannie Log</button></div><div id="quickLogSaved" class="save-confirm hidden">✓ Added to Frannie Log.</div></div>
 
-  <div class="timeline-filter" id="mainLogFilters">
-    <button class="active" onclick="setMainLogFilter('all',this)">All</button>
-    <button onclick="setMainLogFilter('training',this)">Training</button>
-    <button onclick="setMainLogFilter('treatment',this)">Treatments</button>
-    <button onclick="setMainLogFilter('weight',this)">Weight</button>
-    <button onclick="setMainLogFilter('height',this)">Height</button>
-    <button onclick="setMainLogFilter('feeding',this)">Feeding</button>
-    <button onclick="setMainLogFilter('allergy',this)">Cautions</button>
-    <button onclick="setMainLogFilter('note',this)">Notes</button>
-  </div>
-
-  <div id="mainLogList"></div>
+  <details class="history-collapse">
+    <summary>Frannie Log history <span>Open entries</span></summary>
+    <div class="history-collapse-body">
+      <div class="timeline-filter" id="mainLogFilters">
+        <button class="active" onclick="setMainLogFilter('all',this)">All</button>
+        <button onclick="setMainLogFilter('training',this)">Training</button>
+        <button onclick="setMainLogFilter('treatment',this)">Treatments</button>
+        <button onclick="setMainLogFilter('weight',this)">Weight</button>
+        <button onclick="setMainLogFilter('height',this)">Height</button>
+        <button onclick="setMainLogFilter('feeding',this)">Feeding</button>
+        <button onclick="setMainLogFilter('allergy',this)">Cautions</button>
+        <button onclick="setMainLogFilter('note',this)">Notes</button>
+      </div>
+      <div id="mainLogList"></div>
+    </div>
+  </details>
 
   <div class="care-section" style="margin-top:16px">
     <h3>Share, back up, or print</h3>
@@ -183,7 +187,7 @@
 <div style="margin-top:9px"><label>Note</label><input id="heightNote" placeholder="Optional"></div><div class="actions"><button id="heightSaveBtn" class="primary" onclick="saveHeight()">Add height</button><button id="heightCancelBtn" class="secondary hidden" onclick="cancelHeightEdit()">Cancel edit</button></div><div class="entry-list" id="heightList"></div></div></div>
 <div class="care-section full"><h3>Care note</h3><div class="row-2"><div><label>Date</label><input id="careNoteDate" type="date"></div><div><label>Title</label><input id="careNoteTitle" placeholder="e.g. Started supplement"></div></div>
 <div style="margin-top:9px"><label>Note</label><textarea id="careNoteText" placeholder="What changed or what should Mollie remember?"></textarea></div><div class="actions"><button id="careNoteSaveBtn" class="primary" onclick="saveCareNote()">Add to timeline</button><button id="careNoteCancelBtn" class="secondary hidden" onclick="cancelCareNoteEdit()">Cancel edit</button></div></div>
-<div class="care-section full"><h3>Frannie timeline</h3><p class="disclaimer">This timeline is Frannie’s history. Removing a current item does not erase its historical record.</p><div class="timeline-filter" id="careTimelineFilters"><button class="active" onclick="setTimelineFilter('all',this)">All</button><button onclick="setTimelineFilter('training',this)">Training</button><button onclick="setTimelineFilter('treatment',this)">Treatments</button><button onclick="setTimelineFilter('weight',this)">Weight</button><button onclick="setTimelineFilter('height',this)">Height</button><button onclick="setTimelineFilter('feeding',this)">Feeding</button><button onclick="setTimelineFilter('allergy',this)">Cautions</button><button onclick="setTimelineFilter('note',this)">Notes</button></div><div id="timelineList"></div></div>
+<div class="care-section full"><details class="history-collapse"><summary>Frannie timeline <span>Open history</span></summary><div class="history-collapse-body"><p class="disclaimer">This timeline is Frannie’s history. Removing a current item does not erase its historical record.</p><div class="timeline-filter" id="careTimelineFilters"><button class="active" onclick="setTimelineFilter('all',this)">All</button><button onclick="setTimelineFilter('training',this)">Training</button><button onclick="setTimelineFilter('treatment',this)">Treatments</button><button onclick="setTimelineFilter('weight',this)">Weight</button><button onclick="setTimelineFilter('height',this)">Height</button><button onclick="setTimelineFilter('feeding',this)">Feeding</button><button onclick="setTimelineFilter('allergy',this)">Cautions</button><button onclick="setTimelineFilter('note',this)">Notes</button></div><div id="timelineList"></div></div></details></div>
 </div></div></section>
 
 <section id="safety" class="screen">
@@ -216,9 +220,9 @@
 <div class="modal-fallback">The video is streamed from YouTube. If the uploader blocks embedded playback, <a id="youtubeFallback" target="_blank" rel="noopener">open the official video on YouTube</a>.</div>
 </div></div>
 
-<script src="app.js?v=25" defer></script>
-<script src="shared-care-core.js?v=7" defer></script>
-<script src="shared-care.js?v=7" defer></script>
+<script src="app.js?v=26" defer></script>
+<script src="shared-care-core.js?v=8" defer></script>
+<script src="shared-care.js?v=8" defer></script>
 <script src="frannies-training-update.js?v=1" defer></script>
 <section id="printReport" class="print-only"></section></body>
 </html>

@@ -130,6 +130,8 @@
     if(input&&document.activeElement!==input)input.value=userName;
     if(label)label.textContent=userName?`Changes from this device will be marked as ${userName}.`:"Add your name so family changes show who made them.";
     if(compactName)compactName.textContent=userName||"Not set";
+    const badge=document.getElementById("cloudCareUserBadge");
+    if(badge){badge.textContent=userName||"";badge.classList.toggle("hidden",!connectionCode||!userName)}
     if(editor)editor.classList.toggle("hidden",Boolean(userName));
     if(compact)compact.classList.toggle("hidden",!userName);
   }
@@ -318,9 +320,9 @@
     renderSitterBanner();
   }
 
-  async function connect(){
+  async function connect(suppliedCode=""){
     const input=document.getElementById("cloudCareCode");
-    const code=input?.value.trim()||"";
+    const code=(suppliedCode||input?.value||"").trim();
     if(!code){alert("Enter the family connection code.");return}
     if(!userName){
       const identity=(document.getElementById("cloudCareUserName")?.value||"").trim();
@@ -346,14 +348,17 @@
   }
 
   function renderConnectionControls(){
-    const input=document.getElementById("cloudCareCode");
     const connectButton=document.getElementById("cloudCareConnect");
     const syncButton=document.getElementById("cloudCareSync");
     const disconnectButton=document.getElementById("cloudCareDisconnect");
-    if(input){input.value="";input.placeholder=connectionCode?"Connected code saved on this device":"Enter family connection code";input.classList.toggle("hidden",Boolean(connectionCode))}
+    const badge=document.getElementById("cloudCareUserBadge");
     if(connectButton)connectButton.classList.toggle("hidden",Boolean(connectionCode));
     if(syncButton)syncButton.classList.toggle("hidden",!connectionCode);
     if(disconnectButton)disconnectButton.classList.toggle("hidden",!connectionCode);
+    if(badge){
+      badge.textContent=userName||"";
+      badge.classList.toggle("hidden",!connectionCode||!userName);
+    }
   }
 
   function readSitterEditor(){
@@ -518,7 +523,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><div class="care-cloud-actions"><input id="cloudCareCode" name="password" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" aria-label="Frannie connection code" placeholder="Frannie connection code"><button id="cloudCareConnect" class="primary" type="button">Connect</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div><p class="password-autofill-note">On iPhone, you can save your name/initials and Frannie connection code in Passwords for faster AutoFill next time.</p></div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" name="username" type="text" maxlength="60" autocomplete="username" autocapitalize="words" placeholder="Mollie, Brett, Michelle, Bill…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Connect to Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Sync now</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" name="username" type="text" maxlength="60" autocomplete="username" autocapitalize="words" placeholder="Mollie, Brett, Michelle, Bill…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><p class="password-autofill-note">On iPhone, you can save your name/initials and Frannie connection code in Passwords for faster AutoFill next time.</p><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
     intro?.after(cloud);
 
     const editor=document.createElement("div");
@@ -538,7 +543,39 @@
     entryAlert.innerHTML=`<div class="sitter-entry-card"><div class="sitter-entry-paws" aria-hidden="true">🐾 &nbsp; 🐾</div><div class="sitter-entry-kicker">CARETAKER ALERT</div><h2 id="sitterEntryAlertTitle">Puppy Sitting Mode</h2><p id="sitterEntryAlertMeta">Active sitter directions are waiting for you.</p><p class="sitter-entry-copy">Please review Frannie’s current food, medication, routine, cautions, and sitter-specific instructions before continuing.</p><button id="continueToSitterInstructions" class="primary" type="button">View sitter instructions</button></div>`;
     document.body.appendChild(entryAlert);
 
-    document.getElementById("cloudCareConnect").addEventListener("click",connect);
+    const connectModal=document.createElement("div");
+    connectModal.className="modal connection-setup-modal";connectModal.id="connectionSetupModal";
+    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p>Enter who is using this device and the family connection code. You only need to do this again if the device is disconnected.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" name="username" type="text" maxlength="60" autocomplete="username" autocapitalize="words" placeholder="Mollie, UB, Brett…"><label for="setupConnectionCode">Frannie connection code</label><input id="setupConnectionCode" name="password" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" placeholder="Connection code"><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
+    document.body.appendChild(connectModal);
+
+    const openConnectionSetup=()=>{
+      const name=document.getElementById("setupUserName");
+      const code=document.getElementById("setupConnectionCode");
+      if(name)name.value=userName||"";
+      if(code)code.value="";
+      connectModal.classList.add("open");
+      document.body.style.overflow="hidden";
+      setTimeout(()=>{(userName?code:name)?.focus()},50);
+    };
+    const closeConnectionSetup=()=>{connectModal.classList.remove("open");document.body.style.overflow=""};
+    const connectFromSetup=async()=>{
+      const name=(document.getElementById("setupUserName")?.value||"").trim();
+      const code=(document.getElementById("setupConnectionCode")?.value||"").trim();
+      if(!name){alert("Add the name or initials for this device.");return}
+      if(!code){alert("Enter the family connection code.");return}
+      userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);
+      const hiddenCode=document.getElementById("cloudCareCode");
+      if(hiddenCode)hiddenCode.value=code;
+      renderIdentityControls();
+      closeConnectionSetup();
+      await connect(code);
+    };
+
+    document.getElementById("cloudCareConnect").addEventListener("click",openConnectionSetup);
+    document.getElementById("setupConnectButton").addEventListener("click",connectFromSetup);
+    document.getElementById("setupCancelButton").addEventListener("click",closeConnectionSetup);
+    connectModal.addEventListener("click",event=>{if(event.target===connectModal)closeConnectionSetup()});
+    document.getElementById("setupConnectionCode").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
     document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
     document.getElementById("cloudCareChangeUser").addEventListener("click",editUserName);
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
@@ -557,16 +594,34 @@
     renderConnectionControls();renderIdentityControls();fillSitterEditor();renderSitterView();renderSitterBanner();renderActivityLog();
     lastCareSnapshot=careSnapshot();
     if(connectionCode)synchronize();
+    else setTimeout(()=>{
+      const splash=document.getElementById("splashScreen");
+      const wait=()=>{if(!splash||splash.classList.contains("hide"))document.getElementById("cloudCareConnect")?.click();else setTimeout(wait,350)};
+      wait();
+    },250);
   }
 
   globalThis.FrannieCloudSync={onLocalPersist,synchronize};
-  globalThis.FrannieSharedCare={afterSplashDismiss:()=>{sitterEntryAlertShown=false;setTimeout(showSitterEntryAlert,80)}};
+  globalThis.FrannieSharedCare={
+    afterSplashDismiss:()=>{sitterEntryAlertShown=false;setTimeout(showSitterEntryAlert,120)},
+    checkSitterMode:()=>{if(state.sitter?.active&&splashDismissed())showSitterEntryAlert()}
+  };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildUI,{once:true});else buildUI();
+
+  let entryRefreshRunning=false;
   async function refreshForAppEntry(){
+    if(entryRefreshRunning)return;
+    entryRefreshRunning=true;
     sitterEntryAlertShown=false;
-    if(connectionCode)await synchronize();
-    if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,100);
+    try{
+      if(connectionCode)await synchronize();
+    }finally{
+      entryRefreshRunning=false;
+      if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,140);
+    }
   }
+  window.addEventListener("pageshow",()=>refreshForAppEntry());
+  window.addEventListener("pagehide",()=>{sitterEntryAlertShown=false});
   window.addEventListener("focus",()=>{if(document.visibilityState==="visible")refreshForAppEntry()});
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="hidden")sitterEntryAlertShown=false;

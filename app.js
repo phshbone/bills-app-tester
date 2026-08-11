@@ -124,6 +124,8 @@ function openLesson(i){current=i;const l=lessons[i];$("lessonTitle").textContent
 function rate(b,v){rating=v;document.querySelectorAll("#ratings button").forEach(x=>x.classList.remove("active"));b.classList.add("active")}
 function completeLesson(){if(!state.completed.includes(current))state.completed.push(current);state.logs.unshift({id:uid(),date:new Date().toLocaleString(),lesson:lessons[current].title,rating:rating||"No rating",notes:$("sessionNotes").value.trim()});persist();renderModules();renderMainLog();showScreen("plan")}
 function showScreen(id,btn){
+  const splash=document.getElementById("splashScreen");
+  if(splash&&!splash.classList.contains("hide"))dismissSplash();
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   $(id).classList.add("active");
   document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
@@ -140,8 +142,22 @@ function openVideo(){const l=lessons[current];$("modalTitle").textContent=l.vide
 function closeVideo(){$("videoModal").classList.remove("open");$("videoFrame").innerHTML="";document.body.style.overflow=""}
 function modalBackdrop(e){if(e.target===$("videoModal"))closeVideo()}
 function resetApp(){if(confirm("Erase Frannie’s saved profile, progress and logs?")){Store.clear();location.reload()}}
-function dismissSplash(){const splash=$("splashScreen");if(!splash)return;splash.classList.add("hide");splash.setAttribute("aria-hidden","true");sessionStorage.setItem("frannieSplashSeen","1");setTimeout(()=>globalThis.FrannieSharedCare?.afterSplashDismiss?.(),180)}
-if(sessionStorage.getItem("frannieSplashSeen")==="1"){const splash=$("splashScreen");if(splash){splash.classList.add("hide");splash.setAttribute("aria-hidden","true")}}
+let splashTimer=null;
+function dismissSplash(){
+  const splash=$("splashScreen");
+  if(!splash||splash.classList.contains("hide"))return;
+  clearTimeout(splashTimer);
+  splash.classList.add("hide");
+  splash.setAttribute("aria-hidden","true");
+  sessionStorage.setItem("frannieSplashSeen","1");
+  setTimeout(()=>globalThis.FrannieSharedCare?.afterSplashDismiss?.(),180);
+}
+if(sessionStorage.getItem("frannieSplashSeen")==="1"){
+  const splash=$("splashScreen");
+  if(splash){splash.classList.add("hide");splash.setAttribute("aria-hidden","true")}
+}else{
+  splashTimer=setTimeout(dismissSplash,3000);
+}
 
 function treatmentStatus(x){if(x.type==="Medication"&&!x.due)return["Ongoing","status-ongoing"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
 function saveTreatment(){const name=$("treatmentName").value.trim();if(!name){alert("Add a treatment or vaccination name.");return}const item={id:editing.treatment||uid(),type:$("treatmentType").value,name,date:$("treatmentDate").value,due:$("treatmentDue").value,note:$("treatmentNote").value.trim()};if(editing.treatment)state.treatments=state.treatments.map(x=>x.id===editing.treatment?item:x);else state.treatments.unshift(item);persist();cancelTreatmentEdit();renderCare();renderMainLog()}
