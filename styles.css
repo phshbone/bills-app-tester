@@ -336,3 +336,12 @@ html.install-required .install-curtain{
 .sitter-entry-copy{font-size:.88rem;color:#5d4a50}
 .sitter-entry-card button{width:100%;margin-top:12px;background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
 @media(max-width:420px){.activity-entry-head{align-items:flex-start;flex-direction:column;gap:1px}.activity-entry-head time{white-space:normal}.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}
+
+/* Compact long Care histories: newest record stays visible; older records expand on demand. */
+.care-history-collapse{margin:10px 0 0;border-top:1px solid rgba(132,79,91,.18);padding-top:8px}
+.care-history-collapse>summary{cursor:pointer;list-style:none;font-weight:800;color:#7f4a59;padding:10px 4px;display:flex;align-items:center;gap:8px}
+.care-history-collapse>summary::-webkit-details-marker{display:none}
+.care-history-collapse>summary::before{content:"▸";font-size:.9em;transition:transform .15s ease}
+.care-history-collapse[open]>summary::before{transform:rotate(90deg)}
+.care-history-collapse[open]>summary{margin-bottom:4px}
+.care-history-previous .entry:first-child{margin-top:0}

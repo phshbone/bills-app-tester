@@ -357,12 +357,16 @@
     }
   }
 
-  function activateSitterInstructions(){
+  async function activateSitterInstructions(){
     const draft=readSitterEditor();
     if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
     state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device"};
-    sitterEntryAlertShown=true;
-    if(persist()){fillSitterEditor();renderSitterView();renderSitterBanner();openSitter()}
+    sitterEntryAlertShown=false;
+    if(persist()){
+      fillSitterEditor();renderSitterView();renderSitterBanner();
+      if(connectionCode)await synchronize();
+      openSitter();
+    }
   }
 
   function endSitterInstructions(){
@@ -535,8 +539,16 @@
   }
 
   globalThis.FrannieCloudSync={onLocalPersist,synchronize};
-  globalThis.FrannieSharedCare={afterSplashDismiss:()=>setTimeout(showSitterEntryAlert,80)};
+  globalThis.FrannieSharedCare={afterSplashDismiss:()=>{sitterEntryAlertShown=false;setTimeout(showSitterEntryAlert,80)}};
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildUI,{once:true});else buildUI();
-  window.addEventListener("focus",()=>{if(connectionCode)synchronize()});
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&connectionCode)synchronize()});
+  async function refreshForAppEntry(){
+    sitterEntryAlertShown=false;
+    if(connectionCode)await synchronize();
+    if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,100);
+  }
+  window.addEventListener("focus",()=>{if(document.visibilityState==="visible")refreshForAppEntry()});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="hidden")sitterEntryAlertShown=false;
+    else refreshForAppEntry();
+  });
 })();
