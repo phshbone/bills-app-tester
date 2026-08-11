@@ -318,3 +318,21 @@ html.install-required .install-curtain{
 .sitter-active-banner small{display:block;margin-top:2px;color:#69535a;font-weight:750;letter-spacing:0}
 .sitter-paw{font-size:1.15rem;line-height:1}
 @media(max-width:420px){.sitter-active-banner{gap:7px;padding:11px 10px}.sitter-active-banner strong{font-size:.82rem}.sitter-active-banner small{font-size:.68rem}.sitter-paw{font-size:1rem}}
+
+/* Final shared-care cleanup: explicit audit timestamps, Passwords hint, sitter entry alert */
+.password-autofill-note{grid-column:1/-1;margin:0!important;font-size:.72rem!important;font-weight:750!important;color:#765f66!important}
+.care-activity li{display:block!important;padding:9px 10px!important}
+.activity-entry-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px}
+.activity-entry-head strong{font-size:.82rem;color:#704753}
+.activity-entry-head time{font-size:.72rem;font-weight:900;color:#5e4b51;white-space:nowrap}
+.care-activity li>span{display:block;font-size:.84rem;line-height:1.35;color:#493c40}
+.sitter-entry-alert{z-index:13000;background:rgba(35,13,18,.82);backdrop-filter:blur(5px)}
+.sitter-entry-card{width:min(92vw,430px);padding:24px 20px 20px;border-radius:22px;background:#fff8f5;border:4px solid #9e2f44;box-shadow:0 24px 80px rgba(54,8,20,.52),0 0 0 6px rgba(158,47,68,.15);text-align:center;color:#3d292e}
+.sitter-entry-paws{font-size:1.45rem;margin-bottom:5px}
+.sitter-entry-kicker{font-size:.72rem;letter-spacing:.16em;font-weight:950;color:#9e2f44;margin-bottom:6px}
+.sitter-entry-card h2{margin:0 0 8px;font-size:1.65rem;color:#76263a}
+.sitter-entry-card p{margin:7px 0;line-height:1.4}
+.sitter-entry-card #sitterEntryAlertMeta{font-weight:900;color:#6d3846}
+.sitter-entry-copy{font-size:.88rem;color:#5d4a50}
+.sitter-entry-card button{width:100%;margin-top:12px;background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
+@media(max-width:420px){.activity-entry-head{align-items:flex-start;flex-direction:column;gap:1px}.activity-entry-head time{white-space:normal}.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}

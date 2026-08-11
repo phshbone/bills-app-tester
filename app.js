@@ -128,7 +128,7 @@ function showScreen(id,btn){
   $(id).classList.add("active");
   document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
   if(btn)btn.classList.add("active");
-  else{const map={home:0,plan:1,care:2,log:3,safety:4};if(map[id]!==undefined)document.querySelectorAll(".nav")[map[id]].classList.add("active")}
+  else{const map={home:0,care:1,plan:2,log:3,safety:4};if(map[id]!==undefined)document.querySelectorAll(".nav")[map[id]].classList.add("active")}
   const scroller=document.querySelector(".app");
   if(scroller){scroller.scrollTop=0;requestAnimationFrame(()=>{scroller.scrollTop=0})}
 }
@@ -140,7 +140,7 @@ function openVideo(){const l=lessons[current];$("modalTitle").textContent=l.vide
 function closeVideo(){$("videoModal").classList.remove("open");$("videoFrame").innerHTML="";document.body.style.overflow=""}
 function modalBackdrop(e){if(e.target===$("videoModal"))closeVideo()}
 function resetApp(){if(confirm("Erase Frannie’s saved profile, progress and logs?")){Store.clear();location.reload()}}
-function dismissSplash(){const splash=$("splashScreen");if(!splash)return;splash.classList.add("hide");splash.setAttribute("aria-hidden","true");sessionStorage.setItem("frannieSplashSeen","1")}
+function dismissSplash(){const splash=$("splashScreen");if(!splash)return;splash.classList.add("hide");splash.setAttribute("aria-hidden","true");sessionStorage.setItem("frannieSplashSeen","1");setTimeout(()=>globalThis.FrannieSharedCare?.afterSplashDismiss?.(),180)}
 if(sessionStorage.getItem("frannieSplashSeen")==="1"){const splash=$("splashScreen");if(splash){splash.classList.add("hide");splash.setAttribute("aria-hidden","true")}}
 
 function treatmentStatus(x){if(x.type==="Medication"&&!x.due)return["Ongoing","status-ongoing"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
