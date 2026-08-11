@@ -378,3 +378,30 @@ html.install-required .install-curtain{
   .care-user-badge{max-width:92px;padding:6px 8px}
   .history-collapse>summary{padding:12px}
 }
+
+
+/* FRICTION-approved navigation and current-care clarity */
+.care-jump-nav{
+  display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px;
+  scroll-margin-top:90px;
+}
+.care-jump-nav button{
+  border:1px solid #9b6d76;background:#fffaf7;color:#875363;
+  border-radius:999px;padding:9px 13px;font:inherit;font-weight:850;cursor:pointer;
+}
+.care-jump-nav button:active{transform:translateY(1px)}
+#care-treatments,#care-feeding,#care-cautions,#care-measurements,#care-notes,#sitterEditor{
+  scroll-margin-top:86px;
+}
+.care-top-button{
+  position:fixed;right:16px;bottom:106px;z-index:9500;
+  border:1px solid #9b6d76;background:#fff8f5;color:#704753;
+  border-radius:999px;padding:9px 12px;font:inherit;font-size:.78rem;font-weight:950;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);
+}
+.care-top-button.hidden{display:none!important}
+@media(max-width:430px){
+  .care-jump-nav{gap:7px}
+  .care-jump-nav button{padding:8px 11px;font-size:.78rem}
+  .care-top-button{right:12px;bottom:104px}
+}
