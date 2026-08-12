@@ -1,7 +1,6 @@
-FRANNIE FULL BTR v2 TEST BUILD
-Generated: August 11, 2026
+FRANNIE BTR v2 OBSERVED-DEVICE REPAIR
 
-REPLACE:
+REPLACE THESE SIX FILES:
 - index.html
 - app.js
 - styles.css
@@ -9,15 +8,19 @@ REPLACE:
 - shared-care-core.js
 - shared-care.js
 
-INCLUDED FOR REFERENCE:
-- BTR-V2-TEST-REPORT.txt
-- MANIFEST.txt
+EXTRA DOCUMENT:
+- BTR-V2-REPAIR-REPORT.txt
 
-DO NOT CHANGE / DEPLOY THROUGH THIS ZIP:
+DO NOT CHANGE:
+- manifest.json
+- frannies-training-update.js
+- assets/
 - Cloudflare Worker
 - D1 database
-- secrets
-- node_modules
-- GitHub settings
 
-This package is the full six-file tester build after BUILD · TEST · REPAIR v2.
+CACHE VERSIONS
+- styles.css?v=28
+- app.js?v=28
+- shared-care-core.js?v=12
+- shared-care.js?v=12
+- service worker cache: frannies-good-girl-v32

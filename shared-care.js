@@ -33,6 +33,7 @@
   let lastCareSnapshot=null;
   let sitterDismissedThisForeground=false;
   let sitterActiveIntent=null;
+  let focusSelectionIntent=null;
 
   const TRACKED_ARRAYS={
     treatments:{label:"treatment / vaccination",name:item=>item?.name||item?.type||"item"},
@@ -288,6 +289,9 @@
           if(!core.same(local[field],base[field]))shared[field]=Array.isArray(local[field])?[...local[field]]:[];
         });
       }
+      if(focusSelectionIntent!==null){
+        shared.selected=[...focusSelectionIntent];
+      }
       if(sitterActiveIntent!==null){
         shared.sitter={...(shared.sitter||{}),active:sitterActiveIntent};
         if(sitterActiveIntent){
@@ -301,6 +305,7 @@
       saveSyncMeta();
       if(changedDuringSync){
         const preserved=core.merge(local,newestLocal,shared);
+        if(focusSelectionIntent!==null)preserved.selected=[...focusSelectionIntent];
         if(sitterActiveIntent!==null)preserved.sitter={...(preserved.sitter||{}),active:sitterActiveIntent};
         applyShared(preserved);
         syncAgain=true;
@@ -308,6 +313,11 @@
       }else{
         applyShared(shared);
         status("Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
+      }
+      if(focusSelectionIntent!==null){
+        const remoteSelected=core.normalize(result.data||{}).selected||[];
+        if(core.same(remoteSelected,focusSelectionIntent))focusSelectionIntent=null;
+        else syncAgain=true;
       }
       if(sitterActiveIntent!==null && Boolean(core.normalize(result.data||{}).sitter?.active)===sitterActiveIntent){
         sitterActiveIntent=null;
@@ -333,6 +343,9 @@
 
   let pendingExplicitActivity=null;
   function setNextActivity(action){pendingExplicitActivity=String(action||"").trim()||null}
+  function setFocusIntent(values){
+    focusSelectionIntent=Array.isArray(values)?[...values]:[];
+  }
 
   function onLocalPersist(){
     const now=careSnapshot();
@@ -532,13 +545,18 @@
   }
 
   function sitterSections(){
-    const medications=(state.treatments||[]).filter(item=>item.type==="Medication");
+    // Care already presents the first entry as current and collapses older
+    // entries under "Show previous…". Sitter must follow that same current
+    // view instead of exposing the collapsed historical entries.
+    const currentFood=(state.feedingItems||[]).slice(0,1);
+    const currentMedication=(state.treatments||[]).filter(item=>item.type==="Medication").slice(0,1);
+    const currentCautions=(state.allergies||[]).slice(0,1);
     return [
-      {title:"Food & feeding",items:(state.feedingItems||[]).map(item=>[item.category,item.brand,item.amount,item.schedule,item.note].filter(Boolean).join(" · "))},
-      {title:"Medications & instructions",items:medications.map(item=>[item.name,item.note,item.date?"Started "+prettyDate(item.date):"",item.due?"Through / due "+prettyDate(item.due):""].filter(Boolean).join(" · "))},
+      {title:"Food & feeding",items:currentFood.map(item=>[item.category,item.brand,item.amount,item.schedule,item.note].filter(Boolean).join(" · "))},
+      {title:"Medications & instructions",items:currentMedication.map(item=>[item.name,item.note,item.date?"Started "+prettyDate(item.date):"",item.due?"Through / due "+prettyDate(item.due):""].filter(Boolean).join(" · "))},
       {title:"Potty / outside routine",items:[state.sitter?.pottyRoutine].filter(Boolean)},
       {title:"Crate / sleep instructions",items:[state.sitter?.crateSleep].filter(Boolean)},
-      {title:"Allergies & cautions",items:(state.allergies||[]).map(item=>item.text).filter(Boolean)},
+      {title:"Allergies & cautions",items:currentCautions.map(item=>item.text).filter(Boolean)},
       {title:"Emergency & vet information",items:[state.sitter?.emergencyVet].filter(Boolean)},
       {title:"Sitter-specific instructions",items:[state.sitter?.instructions].filter(Boolean)}
     ];
@@ -716,13 +734,13 @@
         wait();
       },250);
     }else if(connectionCode&&userName){
-      synchronize();
+      setTimeout(()=>refreshForAppEntry(),0);
     }else if(!connectionCode){
       status("Not connected — use the family setup link or Connect to Frannie","neutral");
     }
   }
 
-  globalThis.FrannieCloudSync={onLocalPersist,synchronize,setNextActivity};
+  globalThis.FrannieCloudSync={onLocalPersist,synchronize,setNextActivity,setFocusIntent};
   globalThis.FrannieSharedCare={
     afterSplashDismiss:()=>{sitterDismissedThisForeground=false;setTimeout(showSitterEntryAlert,160)},
     checkSitterMode:()=>{if(state.sitter?.active&&splashDismissed())showSitterEntryAlert()}
@@ -748,4 +766,8 @@
     if(document.visibilityState==="hidden")sitterDismissedThisForeground=false;
     else refreshForAppEntry();
   });
+
+  // Some installed iOS PWA restores do not deliver lifecycle events in the
+  // same sequence as Safari. Run one explicit entry check after startup too.
+  setTimeout(()=>{if(document.visibilityState!=="hidden")refreshForAppEntry()},450);
 })();

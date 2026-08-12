@@ -1,0 +1,84 @@
+FRANNIE — BUILD · TEST · REPAIR v2
+Observed-device repair pass
+Date: August 11, 2026
+
+STATUS
+PASS WITH REAL-DEVICE TESTS REQUIRED
+
+BASELINE
+Frannie-BTR-v2-FULL-TESTER.zip
+
+LOCKED SCOPE
+1. Sitter alert must return on fresh app reopen while sitter.active remains true.
+2. Sitter checklist must not expose entries Care labels as previous/history.
+3. Home focus buttons must save and visibly highlight selections.
+4. Recent Shared Changes must retain and display exactly one audit entry per explicit change.
+5. Upcoming/due treatments receive a small visual emphasis in Frannie Log.
+
+REPAIRS
+
+1. SITTER REOPEN
+- Centralized startup/foreground refresh path is reused at initial connected startup.
+- Added one explicit post-startup foreground check for installed iOS PWA restore sequences.
+- pageshow and visibilitychange checks remain.
+- Viewing sitter instructions does not change sitter.active.
+
+2. SITTER CURRENT-CARE FILTER
+- Care already presents the first item as current and collapses later entries under “Show previous…”.
+- Sitter now follows that same visible-current convention:
+  • first/current feeding item only
+  • newest/current medication only
+  • first/current caution only
+- Sitter directions/routine fields remain unchanged.
+- Historical records remain available in Care/Frannie Log.
+
+3. FOCUS BUTTON STATE
+- Added explicit focus-selection intent during shared synchronization.
+- Local user selection is preserved while a sync response is in flight.
+- Button class and aria-pressed state update immediately.
+- CSS also keys selected appearance from aria-pressed=true as a second visual guarantee.
+
+4. RECENT SHARED CHANGES
+- Root cause found in merge semantics: activityLog was treated as an ordinary editable object array.
+- A stale/empty device could therefore interpret missing audit entries as deletions.
+- activityLog is now append-only during merges, deduplicated by entry ID, sorted newest-first, capped at 100.
+- Existing explicit activity creation path remains; no duplicate logger was added.
+
+5. UPCOMING TREATMENTS
+- Current treatment entries that are Due soon receive a subtle highlighted background and Upcoming badge.
+- Overdue items receive a distinct overdue treatment style.
+- Historical treatment entries are not converted into upcoming alerts.
+
+PROVEN / EXECUTED
+- JavaScript syntax validation: app.js, shared-care-core.js, shared-care.js, sw.js.
+- Core regression tests:
+  • stale/empty audit state cannot erase remote audit entries
+  • local audit addition survives merge exactly once
+  • ordinary feeding-item deletion behavior remains intact
+  • local focus additions still survive primitive-array merge
+- Cache/reference alignment:
+  • styles.css v28
+  • app.js v28
+  • shared-care-core.js v12
+  • shared-care.js v12
+  • service worker cache v32
+- Static checks for sitter current filtering, startup entry refresh, focus-intent hook, focus selected styling, due-treatment styling, append-only audit merge.
+
+REQUIRES REAL-DEVICE TEST
+A. Activate sitter mode → view instructions → fully close PWA → reopen from Home Screen → sitter alert must return.
+B. Open sitter checklist → verify only the Care-current feeding item/current medication/current caution appear, not items under “Show previous…”.
+C. Tap multiple Home focus buttons → each must visibly highlight and remain selected after sync/reopen.
+D. Add exactly one Care item → Recent Shared Changes must immediately show one entry with actor/date/time; sync another device and verify that same entry remains exactly once.
+E. Verify a treatment due within 30 days is visually marked Upcoming in Frannie Log without changing ordinary history entries.
+
+DO NOT TOUCH
+- Cloudflare/D1 endpoint architecture
+- manual recovery/setup-link connection flow
+- Care jump navigation / Top button
+- Frannie Log filters
+- main navigation
+- backup/PDF
+- training lesson content
+
+CODEX RECOMMENDATION
+NOT NEEDED at this stage. The remaining validation is actual installed-iPhone/live-sync behavior, not a repository-wide reasoning gap.

@@ -95,6 +95,20 @@
     return Array.from(result);
   }
 
+  // Activity is an append-only audit trail. A stale/empty device must never
+  // interpret missing audit entries as intentional deletions. Merge by id and
+  // keep the newest copy of each entry, newest timestamp first.
+  function mergeActivityLog(local,remote){
+    const byId=new Map();
+    [...cloneObjectArray(remote),...cloneObjectArray(local)].forEach(item=>{
+      if(item.id)byId.set(item.id,item);
+    });
+    return Array.from(byId.values()).sort((a,b)=>{
+      const left=Date.parse(a.at||"")||0,right=Date.parse(b.at||"")||0;
+      return right-left;
+    }).slice(0,100);
+  }
+
   function merge(baseValue,localValue,remoteValue){
     const base=normalize(baseValue),local=normalize(localValue),remote=normalize(remoteValue);
     const result={
@@ -103,9 +117,11 @@
       sitter:mergeObject(base.sitter,local.sitter,remote.sitter,SITTER_FIELDS)
     };
     PRIMITIVE_ARRAY_FIELDS.forEach(field=>{result[field]=mergePrimitiveArray(base[field],local[field],remote[field])});
-    OBJECT_ARRAY_FIELDS.forEach(field=>{result[field]=mergeArray(base[field],local[field],remote[field])});
+    OBJECT_ARRAY_FIELDS.forEach(field=>{
+      result[field]=field==="activityLog"?mergeActivityLog(local[field],remote[field]):mergeArray(base[field],local[field],remote[field]);
+    });
     return normalize(result);
   }
 
-  root.FrannieCareCore={ARRAY_FIELDS,OBJECT_ARRAY_FIELDS,PRIMITIVE_ARRAY_FIELDS,SITTER_FIELDS,normalize,extract,merge,same};
+  root.FrannieCareCore={ARRAY_FIELDS,OBJECT_ARRAY_FIELDS,PRIMITIVE_ARRAY_FIELDS,SITTER_FIELDS,normalize,extract,merge,same,mergeActivityLog};
 })(globalThis);

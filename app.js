@@ -104,7 +104,7 @@ function hasMeaningfulData(value=state){
 
 function renderProblems(){
   const grid=$("problemGrid");grid.innerHTML="";
-  problems.forEach(p=>{const b=document.createElement("button");b.className="problem"+(state.selected.includes(p)?" active":"");b.textContent=p;b.setAttribute("aria-pressed",state.selected.includes(p));b.onclick=()=>{state.selected=state.selected.includes(p)?state.selected.filter(x=>x!==p):[...state.selected,p];persist();renderProblems();renderModules()};grid.appendChild(b)});
+  problems.forEach(p=>{const b=document.createElement("button");b.className="problem"+(state.selected.includes(p)?" active":"");b.textContent=p;b.setAttribute("aria-pressed",state.selected.includes(p));b.onclick=()=>{state.selected=state.selected.includes(p)?state.selected.filter(x=>x!==p):[...state.selected,p];window.FrannieCloudSync?.setFocusIntent?.(state.selected);b.classList.toggle("active",state.selected.includes(p));b.setAttribute("aria-pressed",state.selected.includes(p));persist();renderProblems();renderModules()};grid.appendChild(b)});
   updateFocusSummary();
 }
 function updateFocusSummary(){const count=state.selected.length;$("focusSummary").textContent=count?"Selected focus: "+state.selected.join(", ")+". Matching lessons will be marked Recommended.":"No focus areas selected yet.";$("buildPlanBtn").disabled=!count}
@@ -229,7 +229,7 @@ function renderWeights(){const renderItem=x=>`<div class="entry"><div class="ent
 function allFrannieEntries(){
   const e=[];
   state.logs.forEach(x=>e.push({type:"training",dateRaw:new Date(x.date).getTime()||0,date:x.date,title:x.lesson,detail:x.rating+(x.notes?" · "+x.notes:"")}));
-  state.treatments.forEach(x=>e.push({type:"treatment",dateRaw:new Date((x.date||"1970-01-01")+"T12:00:00").getTime(),date:prettyDate(x.date),title:x.name,detail:x.type+(x.due?" · Next due "+prettyDate(x.due):"")+(x.note?" · "+x.note:"")}));
+  state.treatments.forEach(x=>{const status=treatmentStatus(x);const attention=status[0]==="Due soon"?"due":status[0]==="Overdue"?"overdue":"";e.push({type:"treatment",dateRaw:new Date((x.date||"1970-01-01")+"T12:00:00").getTime(),date:prettyDate(x.date),title:x.name,detail:x.type+(x.due?" · Next due "+prettyDate(x.due):"")+(x.note?" · "+x.note:""),attention})});
   state.treatmentHistory.forEach(x=>e.push({type:"treatment",dateRaw:new Date((x.date||"1970-01-01")+"T12:00:00").getTime(),date:prettyDate(x.date),title:x.title,detail:[x.type,x.name,x.note].filter(Boolean).join(" · ")}));
   state.weights.forEach(x=>e.push({type:"weight",dateRaw:new Date((x.date||"1970-01-01")+"T12:00:00").getTime(),date:prettyDate(x.date),title:"Weight: "+x.value,detail:x.note||""}));
   state.heights.forEach(x=>e.push({type:"height",dateRaw:new Date((x.date||"1970-01-01")+"T12:00:00").getTime(),date:prettyDate(x.date),title:"Height at shoulder: "+x.value,detail:x.note||""}));
@@ -240,12 +240,12 @@ function allFrannieEntries(){
   return e.sort((a,b)=>b.dateRaw-a.dateRaw);
 }
 function timelineItems(){return allFrannieEntries()}
-function renderTimeline(){const a=timelineItems().filter(x=>timelineFilter==="all"||x.type===timelineFilter);$("timelineList").innerHTML=a.length?a.map(x=>`<div class="timeline-item"><div class="timeline-type">${esc(x.type)}</div><strong>${esc(x.title)}</strong><div class="timeline-date">${esc(x.date||"No date")}</div>${x.detail?`<small>${esc(x.detail)}</small>`:""}${x.editable?`<div style="margin-top:7px"><button class="remove-btn" onclick="editCareNote('${x.id}')">Edit note</button></div>`:""}</div>`).join(""):"<p>No timeline entries yet.</p>"}
+function renderTimeline(){const a=timelineItems().filter(x=>timelineFilter==="all"||x.type===timelineFilter);$("timelineList").innerHTML=a.length?a.map(x=>`<div class="timeline-item${x.attention?` attention-${x.attention}`:""}"><div class="timeline-type">${esc(x.type)}${x.attention?`<span class="timeline-attention">${x.attention==="overdue"?"Overdue":"Upcoming"}</span>`:""}</div><strong>${esc(x.title)}</strong><div class="timeline-date">${esc(x.date||"No date")}</div>${x.detail?`<small>${esc(x.detail)}</small>`:""}${x.editable?`<div style="margin-top:7px"><button class="remove-btn" onclick="editCareNote('${x.id}')">Edit note</button></div>`:""}</div>`).join(""):"<p>No timeline entries yet.</p>"}
 function setTimelineFilter(t,b){timelineFilter=t;document.querySelectorAll("#careTimelineFilters button").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderTimeline()}
 function renderCare(){renderTreatments();renderFeeding();renderAllergies();renderWeights();renderHeights();renderTimeline()}
 
 function addQuickLogNote(){const title=$("quickLogTitle").value.trim(),note=$("quickLogText").value.trim();if(!title&&!note){alert("Add a title or note.");return}state.careNotes.unshift({id:uid(),date:$("quickLogDate").value||todayISO(),title:title||"General log note",note});$("quickLogTitle").value="";$("quickLogText").value="";$("quickLogDate").value=todayISO();persist();renderCare();renderMainLog();const msg=$("quickLogSaved");msg.classList.remove("hidden");setTimeout(()=>msg.classList.add("hidden"),2600)}
-function renderMainLog(){const el=$("mainLogList");if(!el)return;const entries=allFrannieEntries().filter(x=>mainLogFilter==="all"||x.type===mainLogFilter);el.innerHTML=entries.length?entries.map(x=>`<div class="timeline-item"><div class="timeline-type">${esc(x.type)}</div><strong>${esc(x.title)}</strong><div class="timeline-date">${esc(x.date||"No date")}</div>${x.detail?`<small>${esc(x.detail)}</small>`:""}</div>`).join(""):"<p>No entries in this category yet.</p>"}
+function renderMainLog(){const el=$("mainLogList");if(!el)return;const entries=allFrannieEntries().filter(x=>mainLogFilter==="all"||x.type===mainLogFilter);el.innerHTML=entries.length?entries.map(x=>`<div class="timeline-item${x.attention?` attention-${x.attention}`:""}"><div class="timeline-type">${esc(x.type)}${x.attention?`<span class="timeline-attention">${x.attention==="overdue"?"Overdue":"Upcoming"}</span>`:""}</div><strong>${esc(x.title)}</strong><div class="timeline-date">${esc(x.date||"No date")}</div>${x.detail?`<small>${esc(x.detail)}</small>`:""}</div>`).join(""):"<p>No entries in this category yet.</p>"}
 function setMainLogFilter(type,btn){mainLogFilter=type;document.querySelectorAll("#mainLogFilters button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderMainLog()}
 
 function downloadBackup(){
