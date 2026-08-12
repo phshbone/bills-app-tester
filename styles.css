@@ -446,3 +446,8 @@ html.install-required .install-curtain{
 }
 .setup-recovery small{display:block;margin-top:5px;line-height:1.35;color:#77666b}
 .build-stamp{margin:9px 0 4px;font-size:.68rem;font-weight:850;color:#8a7078;letter-spacing:.03em}
+
+
+/* BTR v2.2 */
+.sitter-modal input[type="checkbox"]{touch-action:manipulation}
+.care-history-toggle{touch-action:manipulation;-webkit-tap-highlight-color:transparent}

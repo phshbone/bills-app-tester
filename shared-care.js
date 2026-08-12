@@ -6,7 +6,7 @@
   const SYNC_KEY="frannieCareSyncV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="BTR-v2.1 · cache v33";
+  const BUILD_ID="BTR-v2.2 · cache v34";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
   const core=globalThis.FrannieCareCore;
@@ -24,13 +24,21 @@
     document.cookie=`${encodeURIComponent(name)}=; Max-Age=0; Path=/; SameSite=Lax; Secure`;
   }
 
+  function isStandaloneApp(){
+    return Boolean(window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone===true);
+  }
+
   function setupCodeFromUrl(){
     try{
       const url=new URL(location.href);
       const code=(url.searchParams.get("connect")||"").trim();
       if(!code)return "";
-      url.searchParams.delete("connect");
-      history.replaceState(null,"",url.pathname+url.search+url.hash);
+      // Keep the token on the Safari URL while Add to Home Screen happens.
+      // The standalone PWA consumes it and removes it from its visible URL.
+      if(isStandaloneApp()){
+        url.searchParams.delete("connect");
+        history.replaceState(null,"",url.pathname+url.search+url.hash);
+      }
       return code;
     }catch{return ""}
   }
@@ -55,6 +63,11 @@
   let sitterDismissedThisForeground=false;
   let sitterActiveIntent=null;
   let focusSelectionIntent=null;
+  const sitterChecklistChecks=new Set();
+
+  function sitterChecklistKey(sectionTitle,index,item){
+    return `${sectionTitle}::${index}::${String(item||"")}`;
+  }
 
   const TRACKED_ARRAYS={
     treatments:{label:"treatment / vaccination",name:item=>item?.name||item?.type||"item"},
@@ -154,6 +167,9 @@
     state.activityLog=[entry,...(Array.isArray(state.activityLog)?state.activityLog:[])].slice(0,MAX_ACTIVITY);
     Store.save(state);
     renderActivityLog();
+    if(syncing)syncAgain=true;
+    else scheduleSync();
+    return entry;
   }
 
   function saveUserName(){
@@ -552,10 +568,12 @@
     }
     const activate=document.getElementById("activateSitterInstructions");
     if(activate){
-      const allowed=!active||canEndSitter();
-      activate.disabled=!allowed;
-      activate.textContent=active&&!allowed?`Controlled by ${state.sitter?.activatedBy||"activator"}`:(active?"Re-activate updated directions":"Activate sitter directions");
-      activate.title=active&&!allowed?`Only ${state.sitter?.activatedBy||"the activator"} can change the active sitter mode.`:"";
+      // Once sitter mode is active, Save draft updates the active directions.
+      // Do not make the user "re-activate" an already active mode.
+      activate.disabled=false;
+      activate.classList.toggle("hidden",active);
+      activate.textContent="Activate sitter directions";
+      activate.title="";
     }
   }
 
@@ -585,7 +603,17 @@
     return sitterSections().map(section=>{
       const hasItems=section.items.length>0;
       const items=hasItems?section.items:["Not added yet"];
-      const list=items.map(item=>`<li>${checklist&&hasItems?(print?"□ ":'<input type="checkbox" aria-label="Mark complete"> '):""}${esc(item)}</li>`).join("");
+      const list=items.map((item,index)=>{
+        let control="";
+        if(checklist&&hasItems){
+          if(print)control="□ ";
+          else{
+            const key=sitterChecklistKey(section.title,index,item);
+            control=`<input type="checkbox" data-sitter-check="${esc(key)}" aria-label="Mark complete"${sitterChecklistChecks.has(key)?" checked":""}> `;
+          }
+        }
+        return `<li>${control}${esc(item)}</li>`;
+      }).join("");
       return `<section class="sitter-view-section"><h3>${esc(section.title)}</h3><ul>${list}</ul></section>`;
     }).join("");
   }
@@ -598,8 +626,8 @@
   }
 
   function releaseModalState(){
+    // Keep cleanup simple. Forced transforms caused iOS compositing blackouts.
     document.body.style.overflow="";
-    requestAnimationFrame(()=>{document.documentElement.style.transform="translateZ(0)";requestAnimationFrame(()=>{document.documentElement.style.transform=""})});
   }
   function openSitter(){renderSitterView();document.getElementById("sitterModal")?.classList.add("open")}
   function closeSitter(){document.getElementById("sitterModal")?.classList.remove("open");releaseModalState()}
@@ -750,6 +778,14 @@
     document.getElementById("openSitterView").addEventListener("click",openSitter);
     document.getElementById("closeSitterView").addEventListener("click",closeSitter);
     document.getElementById("sitterChecklistToggle").addEventListener("change",renderSitterView);
+    document.getElementById("sitterViewContent").addEventListener("change",event=>{
+      const checkbox=event.target.closest("input[data-sitter-check]");
+      if(!checkbox)return;
+      const key=checkbox.dataset.sitterCheck||"";
+      if(!key)return;
+      if(checkbox.checked)sitterChecklistChecks.add(key);
+      else sitterChecklistChecks.delete(key);
+    });
     document.getElementById("shareSitterView").addEventListener("click",shareSitter);
     document.getElementById("printSitterView").addEventListener("click",printSitter);
     document.getElementById("continueToSitterInstructions").addEventListener("click",continueToSitterInstructions);
@@ -773,7 +809,11 @@
   globalThis.FrannieCloudSync={onLocalPersist,synchronize,setNextActivity,setFocusIntent};
   globalThis.FrannieSharedCare={
     afterSplashDismiss:()=>{sitterDismissedThisForeground=false;setTimeout(showSitterEntryAlert,160)},
-    checkSitterMode:()=>{if(state.sitter?.active&&splashDismissed())showSitterEntryAlert()}
+    checkSitterMode:()=>{
+      if(!state.sitter?.active)return;
+      sitterDismissedThisForeground=false;
+      if(splashDismissed())showSitterEntryAlert();
+    }
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildUI,{once:true});else buildUI();
 
@@ -781,39 +821,44 @@
   async function refreshForAppEntry(){
     if(entryRefreshRunning)return;
     entryRefreshRunning=true;
-    sitterDismissedThisForeground=false;
     try{
       if(connectionCode&&userName)await synchronize();
     }finally{
       entryRefreshRunning=false;
-      if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,140);
     }
   }
 
-  function reassertActiveSitter(){
+  function forceSitterEntryAlert(){
+    if(!state.sitter?.active)return;
     sitterDismissedThisForeground=false;
-    if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,60);
+    const showWhenReady=()=>{
+      if(!state.sitter?.active)return;
+      if(!splashDismissed()){
+        setTimeout(showWhenReady,120);
+        return;
+      }
+      showSitterEntryAlert();
+    };
+    showWhenReady();
   }
 
-  window.addEventListener("pageshow",()=>{reassertActiveSitter();refreshForAppEntry()});
-  window.addEventListener("pagehide",()=>{sitterDismissedThisForeground=false});
-  window.addEventListener("focus",()=>{if(document.visibilityState==="visible"){reassertActiveSitter();refreshForAppEntry()}});
+  // Fresh standalone launch and foreground return are enough. Avoid heartbeat
+  // and focus loops that repeatedly re-rendered the app while it was in use.
+  window.addEventListener("pageshow",()=>{
+    forceSitterEntryAlert();
+    refreshForAppEntry();
+  });
   document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="hidden")sitterDismissedThisForeground=false;
-    else{reassertActiveSitter();refreshForAppEntry()}
+    if(document.visibilityState==="hidden"){
+      sitterDismissedThisForeground=false;
+      return;
+    }
+    forceSitterEntryAlert();
+    refreshForAppEntry();
   });
 
-  // iOS can freeze and restore a standalone PWA without reliably firing the
-  // lifecycle sequence above. A paused timer creates a measurable gap.
-  let lastHeartbeat=Date.now();
-  setInterval(()=>{
-    const now=Date.now(),gap=now-lastHeartbeat;
-    lastHeartbeat=now;
-    if(gap>3500&&document.visibilityState==="visible"){
-      reassertActiveSitter();
-      if(connectionCode&&userName)refreshForAppEntry();
-    }
-  },1000);
-
-  setTimeout(()=>{if(document.visibilityState!=="hidden"){reassertActiveSitter();refreshForAppEntry()}},450);
+  setTimeout(()=>{
+    forceSitterEntryAlert();
+    refreshForAppEntry();
+  },500);
 })();

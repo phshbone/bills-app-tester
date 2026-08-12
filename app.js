@@ -114,6 +114,7 @@ const Store={
 let state=Store.load();
 let current=0,rating="",seconds=300,ticker=null,timelineFilter="all",mainLogFilter="all";
 let editing={treatment:null,feeding:null,allergy:null,weight:null,height:null,careNote:null};
+const openCareHistoryGroups=new Set();
 function persist(){const saved=Store.save(state);if(saved)window.FrannieCloudSync?.onLocalPersist?.();return saved}
 function uid(){return (crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
@@ -223,17 +224,23 @@ function cancelFeedingEdit(){editing.feeding=null;$("foodCategory").value="Main 
 function removeFeeding(id){const x=state.feedingItems.find(v=>v.id===id);if(!x)return;if(!confirm("Remove this item from Frannie’s current feeding list? Its history will remain in Frannie Log."))return;state.feedingItems=state.feedingItems.filter(v=>v.id!==id);state.feedingHistory.unshift(feedingHistoryEntry("removed",x));if(editing.feeding===id)cancelFeedingEdit();window.FrannieCloudSync?.setNextActivity?.(`Removed food / treat from current care: ${x.brand}`);persist();renderCare();renderMainLog()}
 function careHistoryToggleHtml(items,renderItem,label){
   if(!items.length)return "";
-  const id="care-history-"+uid();
-  return `<div class="care-history-collapse"><button type="button" class="care-history-toggle" aria-expanded="false" aria-controls="${id}" onclick="toggleCareHistory(this)">Show ${items.length} previous ${esc(label)}</button><div id="${id}" class="care-history-previous hidden">${items.map(renderItem).join("")}</div></div>`;
+  const key=String(label||"history").toLowerCase().replace(/[^a-z0-9]+/g,"-");
+  const id="care-history-"+key;
+  const open=openCareHistoryGroups.has(key);
+  return `<div class="care-history-collapse"><button type="button" class="care-history-toggle" data-history-key="${key}" aria-expanded="${open}" aria-controls="${id}" onclick="toggleCareHistory(this)">${open?"Hide":"Show"} ${items.length} previous ${esc(label)}</button><div id="${id}" class="care-history-previous${open?"":" hidden"}">${items.map(renderItem).join("")}</div></div>`;
 }
 function toggleCareHistory(button){
   const target=document.getElementById(button.getAttribute("aria-controls"));
   if(!target)return;
+  const key=button.dataset.historyKey||"";
   const opening=target.classList.contains("hidden");
   target.classList.toggle("hidden",!opening);
   button.setAttribute("aria-expanded",String(opening));
-  if(!button.dataset.showLabel)button.dataset.showLabel=button.textContent.replace(/^Hide /,"Show ");
-  button.textContent=opening?button.dataset.showLabel.replace(/^Show /,"Hide "):button.dataset.showLabel;
+  if(key){
+    if(opening)openCareHistoryGroups.add(key);
+    else openCareHistoryGroups.delete(key);
+  }
+  button.textContent=button.textContent.replace(opening?/^Show /:/^Hide /,opening?"Hide ":"Show ");
 }
 function collapsedHistoryHtml(items,renderItem,label){
   if(!items.length)return "";
@@ -446,8 +453,7 @@ function printFrannieLog(mode="letter"){
 }
 function initializeUI(){loadProfile();renderProblems();renderModules();renderCare();renderMainLog();updateTreatmentActiveVisibility();if(!$("treatmentDate").value)$("treatmentDate").value=todayISO();if(!$("weightDate").value)$("weightDate").value=todayISO();if(!$("heightDate").value)$("heightDate").value=todayISO();if(!$("careNoteDate").value)$("careNoteDate").value=todayISO();if(!$("quickLogDate").value)$("quickLogDate").value=todayISO()}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeVideo()});
-window.addEventListener("pageshow",()=>{state=Store.load();initializeUI();setTimeout(()=>globalThis.FrannieSharedCare?.checkSitterMode?.(),180)});
-window.addEventListener("focus",()=>{if(document.visibilityState==="visible")setTimeout(()=>globalThis.FrannieSharedCare?.checkSitterMode?.(),120)});
+window.addEventListener("pageshow",()=>{state=Store.load();initializeUI();setTimeout(()=>globalThis.FrannieSharedCare?.checkSitterMode?.(),220)});
 window.addEventListener("pagehide",()=>{persist()});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persist()});
 window.addEventListener("storage",e=>{if(e.key===STORAGE_KEY){state=Store.load();initializeUI()}});

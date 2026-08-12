@@ -1,0 +1,147 @@
+BUILD · TEST · REPAIR v2.2 REPORT
+Frannie observed-failure repair
+August 12, 2026
+
+STATUS
+PASS WITH REAL-DEVICE TESTS REQUIRED
+
+SOURCE OF TRUTH
+Frannie-BTR-v2.1-PROVENANCE-REPAIR.zip plus the user's August 12 real-device walkthrough and screenshots.
+
+LOCKED FAILURES ADDRESSED
+
+1. FAMILY SETUP LINK / INITIAL CONNECTION
+Observed:
+Safari setup followed by Add to Home Screen still led the standalone PWA to request the long family code.
+
+Root issue addressed:
+The previous script consumed and removed ?connect= immediately in Safari. That could remove the provisioning token before the standalone Home Screen launch had a chance to use the same setup URL.
+
+Repair:
+- Safari now keeps ?connect= in the setup URL.
+- The standalone PWA consumes the token and then removes it from its own visible URL.
+- Existing localStorage/cookie recovery remains.
+- Manual family-code entry remains recovery-only.
+
+REAL-DEVICE LIMIT:
+Whether iOS launches the installed PWA with the setup URL depends on the installed web-app/start-url behavior. This cannot be proven in the current environment. If BTR-v2.2 still requires the code on a truly fresh install, eliminating that final step requires a backend pairing mechanism (or exposing the private family credential, which this build deliberately does not do).
+
+2. ACTIVE SITTER ALERT ON REOPEN
+Observed:
+sitter.active remained true, but the caretaker alert did not reliably return after the app was swiped away/reopened.
+
+Repair:
+- Removed heartbeat/focus-loop complexity.
+- Fresh pageshow, foreground return, and startup now explicitly force the sitter entry alert when sitter.active is true.
+- The explicit check resets the foreground-dismissed flag.
+- Active state/storage logic itself was left intact.
+
+3. SITTER "RE-ACTIVATE" FRICTION
+Observed:
+Active sitter mode displayed Re-activate updated directions.
+
+Repair:
+- Active sitter mode no longer shows the activation button.
+- Save draft updates the directions while active.
+- End sitter directions remains the explicit off switch.
+
+4. TEMPORARY CARETAKER CHECKLIST
+Observed:
+An individual sitter checkbox briefly checked and then reset when the sitter view rerendered.
+
+Root issue:
+renderSitterView rebuilds the checkbox HTML after sync/render activity.
+
+Repair:
+- Temporary checklist selections are stored in an in-memory Set for the current app session.
+- Each sitter checklist row has a stable key.
+- Rerenders restore checked state.
+- These temporary checks do not sync into Frannie's shared record.
+
+5. BLACK SCREEN AFTER MODALS
+Observed:
+Closing/using modal UI sometimes left a black surface until another touch.
+
+Repair:
+- Removed the forced document transform/repaint workaround.
+- Modal cleanup now only restores normal body overflow.
+- Existing backdrop-blur removal remains.
+This intentionally reduces iOS WebKit compositing manipulation.
+
+6. INTERMITTENT SHOW PREVIOUS DRAWERS
+Observed:
+History drawers could work, then appear unresponsive after later renders/sync.
+
+Repair:
+- Drawer open/closed state is stored by history group.
+- When Care rerenders after sync, an open drawer remains open rather than instantly collapsing and appearing to ignore the tap.
+- Button-driven drawers remain in place.
+
+7. RECENT SHARED CHANGES
+Previous architecture retained:
+- append-only merge by activity ID
+- explicit Care actions call setNextActivity
+- actor/date/time rendering
+
+Additional repair:
+- addActivity now explicitly requests another sync pass itself.
+This prevents an audit entry created during an in-flight state transition from depending solely on the outer persist path to schedule delivery.
+
+IMPORTANT REAL-DEVICE TEST:
+Make one NEW Care edit after installing BTR-v2.2. The activity list should show exactly one entry locally before judging this repair. Old actions made before activity logging existed cannot be reconstructed.
+
+PRESERVED WORKING AREAS
+- multiple explicit Current foods
+- multiple explicit Current medications
+- sitter filtering of all current items
+- current-item green marker/badge
+- allergies/cautions in sitter
+- Frannie Log/history
+- upcoming/overdue treatment styling
+- main navigation
+- Cloudflare/D1 architecture
+- backup/PDF
+- focus selections
+
+EXECUTED TESTS
+29 static/structural regression checks passed, including:
+- syntax for app.js, shared-care.js, shared-care-core.js, sw.js
+- cache/script version alignment
+- setup token only stripped in standalone mode
+- checklist state restoration hooks
+- no heartbeat workaround
+- no forced transform repaint
+- sitter startup reassertion
+- no Re-activate wording
+- history open-state preservation
+- all-current sitter filtering
+- append-only audit merge
+- explicit audit sync request
+- current-item visual marker
+
+Executable core regression passed:
+- active sitter state preserved
+- two simultaneous current foods preserved
+- two simultaneous current medications preserved
+- local + remote audit entries retained
+- audit newest-first ordering retained
+
+BUILD PROVENANCE
+Care > Connection & activity must show:
+Build BTR-v2.2 · cache v34
+
+REAL-DEVICE TEST ORDER
+1. Verify build stamp first. If it is not BTR-v2.2 · cache v34, stop.
+2. Fresh setup-link/Add-to-Home-Screen test.
+3. Activate sitter mode, view instructions, swipe PWA away, reopen.
+4. Confirm active alert returns.
+5. Enable caretaker checklist and check several rows; wait/sync/navigate inside sitter and confirm they stay checked during the session.
+6. Confirm no Re-activate button while sitter mode is active.
+7. Open/close sitter modal repeatedly; verify no black screen.
+8. Open a Show previous drawer, allow sync/rerender, confirm it remains operable/open.
+9. Make exactly one new Care edit; verify exactly one Recent Shared Changes entry with actor/time.
+10. Sync a second device and verify the same audit entry remains exactly once.
+
+CODEX RECOMMENDATION
+USEFUL BUT OPTIONAL.
+If the phone visibly confirms BTR-v2.2 and one of the remaining real-device lifecycle failures still reproduces, Codex becomes more justified. The fresh-install setup issue may instead require a small backend pairing design, which is architectural rather than a code-audit problem.
