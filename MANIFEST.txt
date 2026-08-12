@@ -1,0 +1,23 @@
+FRANNIE FULL BTR v2 TEST BUILD
+Generated: August 11, 2026
+
+REPLACE:
+- index.html
+- app.js
+- styles.css
+- sw.js
+- shared-care-core.js
+- shared-care.js
+
+INCLUDED FOR REFERENCE:
+- BTR-V2-TEST-REPORT.txt
+- MANIFEST.txt
+
+DO NOT CHANGE / DEPLOY THROUGH THIS ZIP:
+- Cloudflare Worker
+- D1 database
+- secrets
+- node_modules
+- GitHub settings
+
+This package is the full six-file tester build after BUILD · TEST · REPAIR v2.

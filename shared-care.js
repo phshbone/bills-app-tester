@@ -25,7 +25,7 @@
   let connectionCode=localStorage.getItem(CONNECTION_KEY)||"";
   let syncMeta=loadSyncMeta();
   let userName=(localStorage.getItem(USER_KEY)||"").trim();
-  let needsIdentitySetup=Boolean(provisionedCode&&!userName);
+  let needsIdentitySetup=Boolean(connectionCode&&!userName);
   let syncTimer=null;
   let syncing=false;
   let syncAgain=false;
@@ -135,6 +135,10 @@
   }
 
   function saveUserName(){
+    if(state.sitter?.active){
+      alert("End the active sitter directions before changing this device name.");
+      return;
+    }
     const input=document.getElementById("cloudCareUserName");
     const name=(input?.value||"").trim();
     if(!name){alert("Enter the name to use for changes from this device.");return}
@@ -163,6 +167,10 @@
   }
 
   function editUserName(){
+    if(state.sitter?.active){
+      alert("End the active sitter directions before changing this device name.");
+      return;
+    }
     document.getElementById("cloudCareIdentityEditor")?.classList.remove("hidden");
     document.getElementById("cloudCareIdentityCompact")?.classList.add("hidden");
     const input=document.getElementById("cloudCareUserName");
@@ -347,8 +355,7 @@
   }
 
   async function connect(suppliedCode=""){
-    const input=document.getElementById("cloudCareCode");
-    const code=(suppliedCode||input?.value||connectionCode||"").trim();
+    const code=(suppliedCode||connectionCode||"").trim();
     if(!code){alert("Open the Frannie family setup link on this device first.");return}
     if(!userName){
       const identity=(document.getElementById("cloudCareUserName")?.value||"").trim();
@@ -648,14 +655,18 @@
 
     const connectModal=document.createElement("div");
     connectModal.className="modal connection-setup-modal";connectModal.id="connectionSetupModal";
-    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p id="setupIntro">Type your name or initials. The family setup link supplies the connection automatically.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, UB, Brett…"><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect to Frannie</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
+    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p id="setupIntro">Type your name or initials. A family setup link can supply the connection automatically.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" type="text" maxlength="60" autocapitalize="words" autocomplete="off" placeholder="Mollie, UB, Brett…"><div id="setupRecovery" class="setup-recovery"><label for="setupConnectionCode">Family connection code</label><input id="setupConnectionCode" type="text" maxlength="120" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Enter only if this device needs manual recovery"><small>Usually you will not need this. It is the fallback for a new, cleared, or disconnected device when a setup link is unavailable.</small></div><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect to Frannie</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
     document.body.appendChild(connectModal);
 
     const openConnectionSetup=()=>{
       const name=document.getElementById("setupUserName");
       const intro=document.getElementById("setupIntro");
+      const recovery=document.getElementById("setupRecovery");
+      const manualCode=document.getElementById("setupConnectionCode");
       if(name)name.value=userName||"";
-      if(intro)intro.textContent=connectionCode?"Type your name or initials. This device already has Frannie’s family connection.":"Open the Frannie family setup link on this device first, then type your name or initials.";
+      if(manualCode)manualCode.value="";
+      if(intro)intro.textContent=connectionCode?"Type your name or initials. This device already has Frannie’s family connection.":"Type your name or initials. If you opened a family setup link, the connection is already supplied. Otherwise use the family connection code below as a recovery fallback.";
+      if(recovery)recovery.classList.toggle("hidden",Boolean(connectionCode));
       connectModal.classList.add("open");
       document.body.style.overflow="hidden";
       setTimeout(()=>name?.focus(),50);
@@ -663,12 +674,14 @@
     const closeConnectionSetup=()=>{connectModal.classList.remove("open");document.body.style.overflow=""};
     const connectFromSetup=async()=>{
       const name=(document.getElementById("setupUserName")?.value||"").trim();
+      const manualCode=(document.getElementById("setupConnectionCode")?.value||"").trim();
+      const code=(connectionCode||manualCode).trim();
       if(!name){alert("Add the name or initials for this device.");return}
-      if(!connectionCode){alert("This device does not have Frannie’s connection yet. Open the family setup link first.");return}
+      if(!code){alert("Open the family setup link or enter the family connection code.");return}
       userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);
       renderIdentityControls();
       closeConnectionSetup();
-      await connect(connectionCode);
+      await connect(code);
     };
 
     document.getElementById("cloudCareConnect").addEventListener("click",openConnectionSetup);
@@ -676,6 +689,7 @@
     document.getElementById("setupCancelButton").addEventListener("click",closeConnectionSetup);
     connectModal.addEventListener("click",event=>{if(event.target===connectModal)closeConnectionSetup()});
     document.getElementById("setupUserName").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
+    document.getElementById("setupConnectionCode").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
     document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
     document.getElementById("cloudCareChangeUser").addEventListener("click",editUserName);
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
@@ -704,7 +718,7 @@
     }else if(connectionCode&&userName){
       synchronize();
     }else if(!connectionCode){
-      status("Not connected — open the Frannie family setup link once on this device","neutral");
+      status("Not connected — use the family setup link or Connect to Frannie","neutral");
     }
   }
 

@@ -1,0 +1,71 @@
+FRANNIE — BUILD · TEST · REPAIR v2
+August 11, 2026
+
+STATUS: PASS WITH REAL-DEVICE TESTS REQUIRED
+
+BASELINE
+- Full six-file FRICTION build supplied by user.
+- Latest three-file repair was applied as the starting repair layer.
+
+DEFECTS CONFIRMED IN THE SIX-FILE BASELINE
+1. Care Top button watched window.scrollY instead of the .app PWA scroll container.
+2. Stale sitterEntryAlertShown variable remained in pagehide logic.
+3. Redundant focus lifecycle refresh competed with pageshow/visibilitychange.
+4. Old setup UI behaved like username/password and encouraged iPhone Password AutoFill friction.
+5. Sitter ownership could be bypassed through re-activation in the earlier implementation.
+
+ADDITIONAL V2 STATE-TRANSITION DEFECT FOUND
+6. The new one-time-link-only setup path created a bootstrap failure when an existing/cleared/disconnected device no longer had the stored family connection. It instructed the user to obtain a setup link from an already-connected device without preserving an independent recovery path.
+
+REPAIRS IN THIS PACKAGE
+- Top button uses .app scrollTop.
+- Stale sitter variable removed.
+- Redundant focus handler removed.
+- Sitter alert rechecks on pageshow and visibility return.
+- Sitter End syncs immediately.
+- Non-activator cannot End or Re-activate active sitter mode.
+- Device identity cannot be changed while sitter mode is active, preventing a UI ownership bypass.
+- One-time ?connect= setup links remain supported.
+- Setup code is removed from the visible URL after capture.
+- Existing stored connection + identity auto-reconnects.
+- Stored connection + missing identity prompts identity setup.
+- Missing connection can recover either from the setup link OR manual family connection code.
+- Manual recovery field does not use username/password autocomplete semantics.
+- Reconnect / Sync uses stored connection information.
+- Current feeding items remain separate from feeding history.
+- Service worker/cache versions bumped and HTML script versions aligned.
+
+PROVEN / EXECUTED
+- JavaScript syntax: app.js, shared-care-core.js, shared-care.js, sw.js.
+- Core merge logic: current-item removal, history retention, remote addition preservation.
+- Core merge logic: sitter activation/owner preservation.
+- Core merge logic: primitive selection merge.
+- No duplicate static IDs in index.html.
+- All literal getElementById / $() references resolve to static or dynamically-created IDs.
+- ZIP integrity check.
+
+STATICALLY CHECKED
+- No stale sitterEntryAlertShown reference.
+- No redundant focus re-entry listener.
+- Top control reads .app scrollTop.
+- Manual recovery path exists.
+- Setup-link code is stripped from URL.
+- Partial connection/identity state has a recovery path.
+- Identity switching is blocked during active sitter mode.
+- Non-owner sitter controls are disabled.
+- HTML and service-worker shared-care version references are aligned.
+
+REQUIRES REAL-WORLD TEST
+1. Existing installed iPhone upgrade retains saved identity/connection.
+2. Existing device missing connection can enter the family connection code and recover.
+3. One-time setup link on a new/cleared iPhone asks only for name/initials.
+4. Installed PWA receives v31 cache / v11 shared-care files.
+5. Multi-device Cloudflare/D1 live synchronization.
+6. Sitter alert behavior across actual iOS background/reopen cycles.
+7. Non-activator cannot end/re-activate sitter mode on another device.
+8. Exactly one Recent Shared Changes record appears after one edit.
+9. Removing obsolete food removes it from current Care/Sitter while retaining Frannie Log history.
+10. Care Top button appears and works on iPhone after sufficient .app scrolling.
+
+CODEX RECOMMENDATION
+NOT NEEDED at this stage. Complete the real-device tests first. Escalate only if intermittent or repository-wide issues remain.
