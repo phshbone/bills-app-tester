@@ -22,8 +22,36 @@ const focusLessonMap={
 
 
 const STORAGE_KEY="franniesGoodGirlStableV1";
-const STORAGE_VERSION=6;
+const STORAGE_VERSION=7;
 const $=id=>document.getElementById(id);
+
+
+function normalizeFeedingItems(items){
+  const list=Array.isArray(items)?items.map(item=>({...item})):[];
+  // If this dataset already has explicit current flags, respect them exactly.
+  if(list.some(item=>typeof item.active==="boolean")){
+    return list.map(item=>({...item,active:Boolean(item.active)}));
+  }
+  // One-time migration for older builds: keep the newest item in each category current.
+  // The user can then explicitly mark any additional simultaneous items current.
+  const seen=new Set();
+  return list.map(item=>{
+    const category=item.category||"Other";
+    const active=!seen.has(category);
+    seen.add(category);
+    return {...item,active};
+  });
+}
+function normalizeTreatments(items){
+  const list=Array.isArray(items)?items.map(item=>({...item})):[];
+  const today=todayISO();
+  return list.map(item=>{
+    if(item.type!=="Medication")return item;
+    if(typeof item.active==="boolean")return {...item,active:Boolean(item.active)};
+    // One-time migration: ongoing or not-yet-ended medications start current.
+    return {...item,active:!item.due||item.due>=today};
+  });
+}
 
 function defaultState(){
   return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""}};
@@ -39,7 +67,7 @@ function normalizeState(raw){
     selected:Array.isArray(raw.selected)?raw.selected:[],
     completed:Array.isArray(raw.completed)?raw.completed:[],
     logs:Array.isArray(raw.logs)?raw.logs:[],
-    treatments:Array.isArray(raw.treatments)?raw.treatments:[],
+    treatments:normalizeTreatments(raw.treatments),
     treatmentHistory:Array.isArray(raw.treatmentHistory)?raw.treatmentHistory:[],
     careHistory:Array.isArray(raw.careHistory)?raw.careHistory:[],
     allergies:Array.isArray(raw.allergies)?raw.allergies:[],
@@ -48,15 +76,16 @@ function normalizeState(raw){
     careNotes:Array.isArray(raw.careNotes)?raw.careNotes:[],
     sitter:raw.sitter&&typeof raw.sitter==="object"?raw.sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""},
     feeding:null,
-    feedingItems:Array.isArray(raw.feedingItems)?raw.feedingItems:(raw.feeding&&typeof raw.feeding==="object"?[{
+    feedingItems:normalizeFeedingItems(Array.isArray(raw.feedingItems)?raw.feedingItems:(raw.feeding&&typeof raw.feeding==="object"?[{
       id:raw.feeding.id||"feeding-legacy",
       category:raw.feeding.category||"Main meal",
       brand:raw.feeding.brand||"",
       amount:raw.feeding.amount||"",
       schedule:raw.feeding.schedule||"",
       note:raw.feeding.note||"",
+      active:true,
       addedAt:raw.feeding.updatedAt||todayISO()
-    }]:[]),
+    }]:[])),
     feedingHistory:Array.isArray(raw.feedingHistory)?raw.feedingHistory:[],
     activityLog:Array.isArray(raw.activityLog)?raw.activityLog:[]
   };
@@ -160,9 +189,9 @@ if(sessionStorage.getItem("frannieSplashSeen")==="1"){
 }
 
 function treatmentStatus(x){if(x.type==="Medication"&&!x.due)return["Ongoing","status-ongoing"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
-function saveTreatment(){const name=$("treatmentName").value.trim();if(!name){alert("Add a treatment or vaccination name.");return}const item={id:editing.treatment||uid(),type:$("treatmentType").value,name,date:$("treatmentDate").value,due:$("treatmentDue").value,note:$("treatmentNote").value.trim()};if(editing.treatment){state.treatments=state.treatments.map(x=>x.id===editing.treatment?item:x);window.FrannieCloudSync?.setNextActivity?.(`Edited treatment / vaccination: ${item.name}`);}else{state.treatments.unshift(item);window.FrannieCloudSync?.setNextActivity?.(`Added treatment / vaccination: ${item.name}`);}persist();cancelTreatmentEdit();renderCare();renderMainLog()}
-function editTreatment(id){const x=state.treatments.find(v=>v.id===id);if(!x)return;editing.treatment=id;$("treatmentType").value=x.type;$("treatmentName").value=x.name;$("treatmentDate").value=x.date||"";$("treatmentDue").value=x.due||"";$("treatmentNote").value=x.note||"";setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",true,"Add treatment","Save changes");$("treatmentName").focus()}
-function cancelTreatmentEdit(){editing.treatment=null;$("treatmentType").value="Vaccination";$("treatmentName").value="";$("treatmentDate").value=todayISO();$("treatmentDue").value="";$("treatmentNote").value="";setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",false,"Add treatment","Save changes")}
+function saveTreatment(){const name=$("treatmentName").value.trim();if(!name){alert("Add a treatment or vaccination name.");return}const type=$("treatmentType").value;const item={id:editing.treatment||uid(),type,name,date:$("treatmentDate").value,due:$("treatmentDue").value,note:$("treatmentNote").value.trim(),...(type==="Medication"?{active:Boolean($("treatmentActive")?.checked)}:{})};if(editing.treatment){state.treatments=state.treatments.map(x=>x.id===editing.treatment?item:x);window.FrannieCloudSync?.setNextActivity?.(`Edited treatment / vaccination: ${item.name}`);}else{state.treatments.unshift(item);window.FrannieCloudSync?.setNextActivity?.(`Added treatment / vaccination: ${item.name}`);}persist();cancelTreatmentEdit();renderCare();renderMainLog()}
+function editTreatment(id){const x=state.treatments.find(v=>v.id===id);if(!x)return;editing.treatment=id;$("treatmentType").value=x.type;$("treatmentName").value=x.name;$("treatmentDate").value=x.date||"";$("treatmentDue").value=x.due||"";$("treatmentNote").value=x.note||"";if($("treatmentActive"))$("treatmentActive").checked=x.type==="Medication"?x.active!==false:true;updateTreatmentActiveVisibility();setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",true,"Add treatment","Save changes");$("treatmentName").focus()}
+function updateTreatmentActiveVisibility(){const row=$("treatmentActiveRow");if(!row)return;const isMedication=$("treatmentType")?.value==="Medication";row.classList.toggle("hidden",!isMedication);if(isMedication&&!editing.treatment&&$("treatmentActive"))$("treatmentActive").checked=true} function cancelTreatmentEdit(){editing.treatment=null;$("treatmentType").value="Vaccination";$("treatmentName").value="";$("treatmentDate").value=todayISO();$("treatmentDue").value="";$("treatmentNote").value="";if($("treatmentActive"))$("treatmentActive").checked=true;updateTreatmentActiveVisibility();setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",false,"Add treatment","Save changes")}
 function removeTreatment(id){
   const x=state.treatments.find(v=>v.id===id);if(!x)return;
   const label=x.type==="Medication"?"medication":x.type==="Vaccination"?"vaccination record":"treatment";
@@ -173,11 +202,11 @@ function removeTreatment(id){
   if(editing.treatment===id)cancelTreatmentEdit();window.FrannieCloudSync?.setNextActivity?.(`Removed treatment / vaccination from current care: ${x.name}`);persist();renderCare();renderMainLog()
 }
 
-function feedingHistoryEntry(action,item){return{id:uid(),date:todayISO(),action,category:item.category||"Other",brand:item.brand||"",amount:item.amount||"",schedule:item.schedule||"",note:item.note||""}}
+function feedingHistoryEntry(action,item){return{id:uid(),sourceId:item.id||"",date:todayISO(),action,category:item.category||"Other",brand:item.brand||"",amount:item.amount||"",schedule:item.schedule||"",note:item.note||"",active:Boolean(item.active)}}
 function saveFeeding(){
   const brand=$("foodBrand").value.trim();
   if(!brand){alert("Add the food, treat, chew, or supplement name.");return}
-  const item={id:editing.feeding||uid(),category:$("foodCategory").value,brand,amount:$("foodAmount").value.trim(),schedule:$("foodSchedule").value.trim(),note:$("foodNote").value.trim(),addedAt:todayISO()};
+  const item={id:editing.feeding||uid(),category:$("foodCategory").value,brand,amount:$("foodAmount").value.trim(),schedule:$("foodSchedule").value.trim(),note:$("foodNote").value.trim(),active:Boolean($("foodActive")?.checked),addedAt:todayISO()};
   if(editing.feeding){
     const previous=state.feedingItems.find(x=>x.id===editing.feeding);
     item.addedAt=previous?.addedAt||todayISO();
@@ -189,17 +218,39 @@ function saveFeeding(){
   }
   persist();cancelFeedingEdit();renderCare();renderMainLog()
 }
-function editFeeding(id){const x=state.feedingItems.find(v=>v.id===id);if(!x)return;editing.feeding=id;$("foodCategory").value=x.category||"Other";$("foodBrand").value=x.brand||"";$("foodAmount").value=x.amount||"";$("foodSchedule").value=x.schedule||"";$("foodNote").value=x.note||"";setButtonEdit("feedingSaveBtn","feedingCancelBtn",true,"Add food or treat","Save changes");$("foodBrand").focus()}
-function cancelFeedingEdit(){editing.feeding=null;$("foodCategory").value="Main meal";$("foodBrand").value="";$("foodAmount").value="";$("foodSchedule").value="";$("foodNote").value="";setButtonEdit("feedingSaveBtn","feedingCancelBtn",false,"Add food or treat","Save changes")}
+function editFeeding(id){const x=state.feedingItems.find(v=>v.id===id);if(!x)return;editing.feeding=id;$("foodCategory").value=x.category||"Other";$("foodBrand").value=x.brand||"";$("foodAmount").value=x.amount||"";$("foodSchedule").value=x.schedule||"";$("foodNote").value=x.note||"";if($("foodActive"))$("foodActive").checked=x.active!==false;setButtonEdit("feedingSaveBtn","feedingCancelBtn",true,"Add food or treat","Save changes");$("foodBrand").focus()}
+function cancelFeedingEdit(){editing.feeding=null;$("foodCategory").value="Main meal";$("foodBrand").value="";$("foodAmount").value="";$("foodSchedule").value="";$("foodNote").value="";if($("foodActive"))$("foodActive").checked=true;setButtonEdit("feedingSaveBtn","feedingCancelBtn",false,"Add food or treat","Save changes")}
 function removeFeeding(id){const x=state.feedingItems.find(v=>v.id===id);if(!x)return;if(!confirm("Remove this item from Frannie’s current feeding list? Its history will remain in Frannie Log."))return;state.feedingItems=state.feedingItems.filter(v=>v.id!==id);state.feedingHistory.unshift(feedingHistoryEntry("removed",x));if(editing.feeding===id)cancelFeedingEdit();window.FrannieCloudSync?.setNextActivity?.(`Removed food / treat from current care: ${x.brand}`);persist();renderCare();renderMainLog()}
+function careHistoryToggleHtml(items,renderItem,label){
+  if(!items.length)return "";
+  const id="care-history-"+uid();
+  return `<div class="care-history-collapse"><button type="button" class="care-history-toggle" aria-expanded="false" aria-controls="${id}" onclick="toggleCareHistory(this)">Show ${items.length} previous ${esc(label)}</button><div id="${id}" class="care-history-previous hidden">${items.map(renderItem).join("")}</div></div>`;
+}
+function toggleCareHistory(button){
+  const target=document.getElementById(button.getAttribute("aria-controls"));
+  if(!target)return;
+  const opening=target.classList.contains("hidden");
+  target.classList.toggle("hidden",!opening);
+  button.setAttribute("aria-expanded",String(opening));
+  if(!button.dataset.showLabel)button.dataset.showLabel=button.textContent.replace(/^Hide /,"Show ");
+  button.textContent=opening?button.dataset.showLabel.replace(/^Show /,"Hide "):button.dataset.showLabel;
+}
 function collapsedHistoryHtml(items,renderItem,label){
   if(!items.length)return "";
   const newest=renderItem(items[0]);
-  if(items.length===1)return newest;
-  const previous=items.slice(1).map(renderItem).join("");
-  return `${newest}<details class="care-history-collapse"><summary>Show ${items.length-1} previous ${esc(label)}</summary><div class="care-history-previous">${previous}</div></details>`;
+  return newest+(items.length>1?careHistoryToggleHtml(items.slice(1),renderItem,label):"");
 }
-function renderFeeding(){const el=$("feedingList");const renderItem=x=>`<div class="entry"><div class="entry-top"><div><span class="status-tag status-ongoing">${esc(x.category||"Other")}</span><strong style="display:block;margin-top:6px">${esc(x.brand)}</strong>${x.amount?`<small>Amount: ${esc(x.amount)}</small>`:""}${x.schedule?`<small>When: ${esc(x.schedule)}</small>`:""}${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><button class="remove-btn" onclick="editFeeding('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeFeeding('${x.id}')">Remove</button></div></div></div>`;el.innerHTML=state.feedingItems.length?collapsedHistoryHtml(state.feedingItems,renderItem,"foods & treats"):"<p>No foods, treats, chews, or supplements added yet.</p>"}
+function activeHistoryHtml(items,renderItem,label){
+  if(!items.length)return "";
+  const current=items.filter(item=>item.active===true);
+  const previous=items.filter(item=>item.active!==true);
+  return current.map(renderItem).join("")+(previous.length?careHistoryToggleHtml(previous,renderItem,label):"");
+}
+function renderFeeding(){
+  const el=$("feedingList");
+  const renderItem=x=>`<div class="entry ${x.active===true?"current-entry":""}"><div class="entry-top"><div><span class="status-tag status-ongoing">${esc(x.category||"Other")}</span>${x.active===true?'<span class="current-badge">Current</span>':""}<strong style="display:block;margin-top:6px">${esc(x.brand)}</strong>${x.amount?`<small>Amount: ${esc(x.amount)}</small>`:""}${x.schedule?`<small>When: ${esc(x.schedule)}</small>`:""}${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><button class="remove-btn" onclick="editFeeding('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeFeeding('${x.id}')">Remove</button></div></div></div>`;
+  el.innerHTML=state.feedingItems.length?activeHistoryHtml(state.feedingItems,renderItem,"foods & treats"):"<p>No foods, treats, chews, or supplements added yet.</p>";
+}
 
 function saveAllergy(){const text=$("allergyText").value.trim();if(!text){alert("Add an allergy or caution.");return}const item={id:editing.allergy||uid(),date:editing.allergy?(state.allergies.find(x=>x.id===editing.allergy)?.date||todayISO()):todayISO(),text};if(editing.allergy){state.allergies=state.allergies.map(x=>x.id===editing.allergy?item:x);window.FrannieCloudSync?.setNextActivity?.(`Edited caution: ${item.text}`);}else{state.allergies.unshift(item);window.FrannieCloudSync?.setNextActivity?.(`Added caution: ${item.text}`);}persist();cancelAllergyEdit();renderCare();renderMainLog()}
 function editAllergy(id){const x=state.allergies.find(v=>v.id===id);if(!x)return;editing.allergy=id;$("allergyText").value=x.text;setButtonEdit("allergySaveBtn","allergyCancelBtn",true,"Add caution","Save changes");$("allergyText").focus()}
@@ -222,7 +273,14 @@ function editCareNote(id){const x=state.careNotes.find(v=>v.id===id);if(!x)retur
 function cancelCareNoteEdit(){editing.careNote=null;$("careNoteDate").value=todayISO();$("careNoteTitle").value="";$("careNoteText").value="";setButtonEdit("careNoteSaveBtn","careNoteCancelBtn",false,"Add to timeline","Save changes")}
 function removeCareNote(id){const x=state.careNotes.find(v=>v.id===id);if(!x)return;if(!confirm("Archive this care note? It will leave the active notes but remain in Frannie Log history."))return;state.careHistory.unshift({id:uid(),type:"note",date:todayISO(),title:"Care note archived: "+x.title,detail:[prettyDate(x.date),x.note].filter(Boolean).join(" · ")});state.careNotes=state.careNotes.filter(v=>v.id!==id);if(editing.careNote===id)cancelCareNoteEdit();window.FrannieCloudSync?.setNextActivity?.(`Removed care note from current care: ${x.title}`);persist();renderCare();renderMainLog()}
 
-function renderTreatments(){const renderItem=x=>{const s=treatmentStatus(x);return`<div class="entry"><div class="entry-top"><div><strong>${esc(x.name)}</strong><small>${esc(x.type)}${x.date?" · Given "+prettyDate(x.date):""}${x.due?" · Next "+prettyDate(x.due):""}</small>${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><span class="status-tag ${s[1]}">${s[0]}</span><br><button class="remove-btn" onclick="editTreatment('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeTreatment('${x.id}')">Remove</button></div></div></div>`};$("treatmentList").innerHTML=state.treatments.length?collapsedHistoryHtml(state.treatments,renderItem,"treatments"):"<p>No treatments or vaccinations added yet.</p>"}
+function renderTreatments(){
+  const renderItem=x=>{
+    const s=treatmentStatus(x);
+    const currentMedication=x.type==="Medication"&&x.active===true;
+    return`<div class="entry ${currentMedication?"current-entry":""}"><div class="entry-top"><div><strong>${esc(x.name)}</strong>${currentMedication?'<span class="current-badge">Current</span>':""}<small>${esc(x.type)}${x.date?" · Given "+prettyDate(x.date):""}${x.due?" · Next "+prettyDate(x.due):""}</small>${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><span class="status-tag ${s[1]}">${s[0]}</span><br><button class="remove-btn" onclick="editTreatment('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeTreatment('${x.id}')">Remove</button></div></div></div>`
+  };
+  $("treatmentList").innerHTML=state.treatments.length?collapsedHistoryHtml(state.treatments,renderItem,"treatments"):"<p>No treatments or vaccinations added yet.</p>";
+}
 function renderAllergies(){const renderItem=x=>`<div class="entry"><div class="entry-top"><strong>${esc(x.text)}</strong><div><button class="remove-btn" onclick="editAllergy('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeAllergy('${x.id}')">Remove</button></div></div></div>`;$("allergyList").innerHTML=state.allergies.length?collapsedHistoryHtml(state.allergies,renderItem,"cautions"):"<p>No allergies or cautions added yet.</p>"}
 function renderHeights(){const renderItem=x=>`<div class="entry"><div class="entry-top"><div><strong>${esc(x.value)}</strong><small>${prettyDate(x.date)}${x.note?" · "+esc(x.note):""}</small></div><div><button class="remove-btn" onclick="editHeight('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeHeight('${x.id}')">Remove</button></div></div></div>`;$("heightList").innerHTML=state.heights.length?collapsedHistoryHtml(state.heights,renderItem,"heights"):"<p>No height entries yet.</p>"}
 function renderWeights(){const renderItem=x=>`<div class="entry"><div class="entry-top"><div><strong>${esc(x.value)}</strong><small>${prettyDate(x.date)}${x.note?" · "+esc(x.note):""}</small></div><div><button class="remove-btn" onclick="editWeight('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeWeight('${x.id}')">Remove</button></div></div></div>`;$("weightList").innerHTML=state.weights.length?collapsedHistoryHtml(state.weights,renderItem,"weights"):"<p>No weight entries yet.</p>"}
@@ -386,9 +444,10 @@ function printFrannieLog(mode="letter"){
   document.documentElement.dataset.printMode=mode;
   const cleanup=()=>{delete document.documentElement.dataset.printMode;window.removeEventListener("afterprint",cleanup)};window.addEventListener("afterprint",cleanup);void $("printReport").offsetHeight;window.print()
 }
-function initializeUI(){loadProfile();renderProblems();renderModules();renderCare();renderMainLog();if(!$("treatmentDate").value)$("treatmentDate").value=todayISO();if(!$("weightDate").value)$("weightDate").value=todayISO();if(!$("heightDate").value)$("heightDate").value=todayISO();if(!$("careNoteDate").value)$("careNoteDate").value=todayISO();if(!$("quickLogDate").value)$("quickLogDate").value=todayISO()}
+function initializeUI(){loadProfile();renderProblems();renderModules();renderCare();renderMainLog();updateTreatmentActiveVisibility();if(!$("treatmentDate").value)$("treatmentDate").value=todayISO();if(!$("weightDate").value)$("weightDate").value=todayISO();if(!$("heightDate").value)$("heightDate").value=todayISO();if(!$("careNoteDate").value)$("careNoteDate").value=todayISO();if(!$("quickLogDate").value)$("quickLogDate").value=todayISO()}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeVideo()});
-window.addEventListener("pageshow",()=>{state=Store.load();initializeUI()});
+window.addEventListener("pageshow",()=>{state=Store.load();initializeUI();setTimeout(()=>globalThis.FrannieSharedCare?.checkSitterMode?.(),180)});
+window.addEventListener("focus",()=>{if(document.visibilityState==="visible")setTimeout(()=>globalThis.FrannieSharedCare?.checkSitterMode?.(),120)});
 window.addEventListener("pagehide",()=>{persist()});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persist()});
 window.addEventListener("storage",e=>{if(e.key===STORAGE_KEY){state=Store.load();initializeUI()}});

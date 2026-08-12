@@ -171,13 +171,13 @@
 <div class="lesson-top"><div><div class="eyebrow" style="color:var(--pink3)">Shared care & reference</div><h2>Frannie Care</h2></div></div>
 <p>Basic puppy information Mollie can keep here while Frannie is still in training.</p><div class="care-grid">
 <div class="care-section" id="care-treatments"><h3>Treatments & vaccinations</h3>
-<div class="row-2"><div><label>Type</label><select id="treatmentType"><option>Vaccination</option><option>Flea & tick</option><option>Heartworm</option><option>Medication</option></select></div><div><label>Name</label><input id="treatmentName" placeholder="e.g. Rabies"></div></div>
+<div class="row-2"><div><label>Type</label><select id="treatmentType" onchange="updateTreatmentActiveVisibility()"><option>Vaccination</option><option>Flea & tick</option><option>Heartworm</option><option>Medication</option></select></div><div><label>Name</label><input id="treatmentName" placeholder="e.g. Rabies"></div></div>
 <div class="row-2" style="margin-top:9px"><div><label>Date given / started</label><input id="treatmentDate" type="date"></div><div><label>Next due / end date</label><input id="treatmentDue" type="date"></div></div>
-<div style="margin-top:9px"><label>Note</label><input id="treatmentNote" placeholder="Optional"></div><div class="actions"><button id="treatmentSaveBtn" class="primary" onclick="saveTreatment()">Add treatment</button><button id="treatmentCancelBtn" class="secondary hidden" onclick="cancelTreatmentEdit()">Cancel edit</button></div><div class="entry-list" id="treatmentList"></div></div>
+<div style="margin-top:9px"><label>Note</label><input id="treatmentNote" placeholder="Optional"></div><label id="treatmentActiveRow" class="current-item-toggle hidden"><input id="treatmentActive" type="checkbox" checked><span><strong>Current medication</strong><small>Include this medication in current Care and sitter instructions.</small></span></label><div class="actions"><button id="treatmentSaveBtn" class="primary" onclick="saveTreatment()">Add treatment</button><button id="treatmentCancelBtn" class="secondary hidden" onclick="cancelTreatmentEdit()">Cancel edit</button></div><div class="entry-list" id="treatmentList"></div></div>
 <div class="care-section" id="care-feeding"><h3>Foods, treats & supplements</h3><p>Add each item separately so Mollie can keep meals, training treats, chews, supplements, and medication foods organized.</p>
 <div class="row-2"><div><label>Use</label><select id="foodCategory"><option>Main meal</option><option>Training treat</option><option>Regular treat</option><option>Chew</option><option>Supplement</option><option>Medication food</option><option>Other</option></select></div><div><label>Food / brand</label><input id="foodBrand" placeholder="e.g. Purina Pro Plan Puppy"></div></div>
 <div class="row-2" style="margin-top:9px"><div><label>Amount</label><input id="foodAmount" placeholder="e.g. 1 cup or small pieces"></div><div><label>Schedule / when used</label><input id="foodSchedule" placeholder="e.g. morning and evening"></div></div>
-<div style="margin-top:9px"><label>Note</label><textarea id="foodNote" placeholder="Optional instructions or reason for use"></textarea></div><div class="actions"><button id="feedingSaveBtn" class="primary" onclick="saveFeeding()">Add food or treat</button><button id="feedingCancelBtn" class="secondary hidden" onclick="cancelFeedingEdit()">Cancel edit</button></div><div class="entry-list" id="feedingList"></div></div>
+<div style="margin-top:9px"><label>Note</label><textarea id="foodNote" placeholder="Optional instructions or reason for use"></textarea></div><label class="current-item-toggle"><input id="foodActive" type="checkbox" checked><span><strong>Current item</strong><small>Include this food, treat, chew, supplement, or medication food in current Care and sitter instructions.</small></span></label><div class="actions"><button id="feedingSaveBtn" class="primary" onclick="saveFeeding()">Add food or treat</button><button id="feedingCancelBtn" class="secondary hidden" onclick="cancelFeedingEdit()">Cancel edit</button></div><div class="entry-list" id="feedingList"></div></div>
 <div class="care-section" id="care-cautions"><h3>Allergies & cautions</h3><div><label>Allergy, sensitivity, or warning</label><input id="allergyText" placeholder="e.g. chicken sensitivity"></div><div class="actions"><button id="allergySaveBtn" class="primary" onclick="saveAllergy()">Add caution</button><button id="allergyCancelBtn" class="secondary hidden" onclick="cancelAllergyEdit()">Cancel edit</button></div><div class="entry-list" id="allergyList"></div></div>
 <div class="care-section" id="care-measurements"><h3>Measurements</h3><p class="disclaimer">Height is measured at the withers—the top of Frannie’s shoulder blades—not the top of her head.</p>
 <div class="timeline-filter" id="measurementTabs"><button class="active" onclick="showMeasurementTab('weight',this)">Weight</button><button onclick="showMeasurementTab('height',this)">Height</button></div>
@@ -220,9 +220,9 @@
 <div class="modal-fallback">The video is streamed from YouTube. If the uploader blocks embedded playback, <a id="youtubeFallback" target="_blank" rel="noopener">open the official video on YouTube</a>.</div>
 </div></div>
 
-<script src="app.js?v=28" defer></script>
-<script src="shared-care-core.js?v=12" defer></script>
-<script src="shared-care.js?v=12" defer></script>
+<script src="app.js?v=29" defer></script>
+<script src="shared-care-core.js?v=13" defer></script>
+<script src="shared-care.js?v=13" defer></script>
 <script src="frannies-training-update.js?v=1" defer></script>
 <section id="printReport" class="print-only"></section></body>
 </html>

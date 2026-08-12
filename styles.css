@@ -413,3 +413,36 @@ html.install-required .install-curtain{
 .timeline-item.attention-overdue{background:#fde8e6;border-left-color:#b64a45}
 .timeline-attention{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:999px;background:#f1d49b;color:#704b18;font-size:.62rem;letter-spacing:.06em;font-weight:950;vertical-align:middle}
 .attention-overdue .timeline-attention{background:#efbbb7;color:#7a2e2a}
+
+
+/* BTR v2.1 — explicit current state + iPhone reliability */
+.current-item-toggle{
+  display:flex;align-items:flex-start;gap:10px;margin:12px 0 2px;padding:11px 12px;
+  border:1px solid rgba(91,135,91,.36);border-radius:13px;background:#f5faf3;color:#405b41;
+}
+.current-item-toggle input{width:20px;height:20px;flex:0 0 auto;margin:1px 0 0;accent-color:#648d64}
+.current-item-toggle span{display:block;min-width:0}
+.current-item-toggle strong{display:block;font-size:.86rem}
+.current-item-toggle small{display:block;margin-top:2px;font-size:.72rem;line-height:1.35;color:#617061}
+.entry.current-entry{
+  box-shadow:inset 5px 0 0 #6f996f,inset 7px 0 0 rgba(218,235,216,.9);
+  padding-left:15px;
+}
+.current-badge{
+  display:inline-block;margin-left:7px;padding:3px 7px;border-radius:999px;
+  background:#dfeedd;color:#426642;font-size:.62rem;font-weight:950;letter-spacing:.05em;vertical-align:middle;
+}
+.care-history-toggle{
+  width:100%;border:0;background:transparent;color:#7f4a59;padding:10px 4px;text-align:left;
+  font:inherit;font-weight:850;cursor:pointer;touch-action:manipulation;
+}
+.care-history-toggle::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s ease}
+.care-history-toggle[aria-expanded="true"]::before{transform:rotate(90deg)}
+.problem{touch-action:manipulation}
+.sitter-entry-alert,.connection-setup-modal{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.setup-recovery-link{
+  display:inline-block;margin:10px 0 0;padding:0;border:0;background:transparent;color:#875363;
+  text-decoration:underline;font:inherit;font-size:.78rem;font-weight:850;cursor:pointer;
+}
+.setup-recovery small{display:block;margin-top:5px;line-height:1.35;color:#77666b}
+.build-stamp{margin:9px 0 4px;font-size:.68rem;font-weight:850;color:#8a7078;letter-spacing:.03em}

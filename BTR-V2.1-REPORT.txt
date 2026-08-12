@@ -1,0 +1,120 @@
+BUILD · TEST · REPAIR v2.1 REPORT
+Frannie observed-device repair
+August 12, 2026
+
+STATUS
+PASS WITH REAL-DEVICE / LIVE-SYNC TESTS REQUIRED
+
+SOURCE
+bills-app-tester-main.zip
+
+CONFIRMED ROOT CAUSES
+
+A. SITTER FOOD/MEDICATION FILTER
+The supplied build still contained:
+  feedingItems.slice(0,1)
+  medications.filter(...).slice(0,1)
+Therefore only one food and one medication could ever appear in Sitter Mode.
+
+REPAIR
+Explicit active flags are now supported and synchronized.
+Sitter Mode filters all active foods and all active medications.
+
+B. SITTER MODE AFTER IPHONE APP SUSPEND
+The supplied build relied on pageshow/pagehide/visibility timing and a foreground dismissal flag.
+A standalone iOS PWA can be frozen and restored without delivering that event sequence reliably, leaving the old in-memory dismissal flag intact.
+
+REPAIR
+Added independent reassertion plus a timer-gap heartbeat. When JavaScript timers resume after a freeze gap, active sitter mode is treated as a fresh entrance.
+
+C. CONNECTION SETUP
+The supplied build displayed the manual family code field whenever no local connection code existed.
+That made the recovery path look like the normal login.
+
+REPAIR
+- normal setup displays name/initials only
+- manual connection code is hidden behind a recovery link
+- setup URL provisioning is mirrored to a secure same-origin cookie as well as localStorage
+- stored cookie values can restore the local connection/user keys
+
+LIMIT
+A completely unprovisioned device still needs either the one-time setup link or the family code once. Removing both would require exposing the credential in public source or changing the backend pairing design.
+
+D. CURRENT STATE WAS INFERRED FROM DISPLAY ORDER
+The old compact Care presentation treated later array items as “previous,” but that does not model simultaneous current foods or medications correctly.
+
+REPAIR
+Current is explicit data.
+Migration gives older data a safe starting state:
+- newest feeding item per category Current
+- ongoing/non-expired medications Current
+Users can explicitly alter Current afterward.
+
+EXECUTED TESTS — PASS
+- node syntax: app.js
+- node syntax: shared-care-core.js
+- node syntax: shared-care.js
+- node syntax: sw.js
+- core merge preserves two simultaneous active feeding items
+- core merge preserves active medication
+- active flags survive shared-state merge
+- append-only audit merge retains local + remote entries
+- audit log remains newest-first
+- current feeding checkbox code present
+- current medication checkbox code present
+- Sitter filters all active feeding items
+- Sitter filters all active medications
+- Sitter shows all current cautions
+- button-driven Care history control present
+- lifecycle heartbeat / resume-gap check present
+- cookie-backed setup recovery present
+- visible build provenance present
+- service worker references match v29/v13/v33
+- ZIP integrity
+
+REQUIRES REAL IPHONE TEST
+1. Open Care > Connection & activity.
+   Confirm visible stamp: Build BTR-v2.1 · cache v33.
+   If this stamp is absent, STOP: the phone is not running this build.
+
+2. Setup-link test:
+   On a device not connected to Frannie, open the one-time family setup link.
+   Then open/install the PWA.
+   Normal setup should request name/initials, not expose the long code field.
+   Use connection code instead should exist only as recovery.
+
+3. Current food test:
+   Mark at least two foods Current.
+   They may be in the same or different categories.
+   Both must be visible in Care with the green marker and both must appear in Sitter Mode.
+
+4. Current medication test:
+   Mark two medications Current.
+   Both must appear in Sitter Mode.
+
+5. Previous test:
+   Uncheck Current on one food.
+   It must leave Sitter Mode but remain under Show previous / history.
+
+6. Sitter persistence test:
+   Activate sitter mode.
+   View sitter instructions.
+   Swipe the PWA away or leave it suspended.
+   Reopen from the Home Screen icon.
+   The caretaker alert must return until the activator explicitly ends sitter mode.
+
+7. Drawer test:
+   Repeatedly open and close Show previous treatments/foods/cautions.
+
+8. Modal repaint test:
+   Open/close sitter and connection overlays repeatedly.
+   No black screen should remain after close.
+
+9. Live audit test:
+   Make one Care edit.
+   Recent Shared Changes must show exactly one local entry with actor/time.
+   Sync another physical device and verify the same entry remains exactly once.
+
+CODEX RECOMMENDATION
+USEFUL BUT OPTIONAL.
+If BTR-v2.1 is visibly confirmed on the phone and sitter persistence still fails, an independent repository/runtime audit becomes more valuable. Until the build stamp is confirmed, another code audit would risk investigating a version the phone is not actually running.
