@@ -44,7 +44,7 @@ const app=fs.readFileSync(new URL("app.js",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=33","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=17"]){
+for(const asset of ["styles.css?v=33","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=18"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
 assert.match(sw,/frannies-good-girl-v38/,"service worker cache version is v38");
