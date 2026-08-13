@@ -25,16 +25,17 @@ Unchanged assets referenced by the service worker (`manifest.json`, `frannies-tr
 - `tests/worker-regression.mjs`
 - `CODEX-ROOT-CAUSE-AUDIT.md`
 - `CODEX-TEST-REPORT.md`
+- `CLOUDFLARE-READONLY-AUDIT.md`
 - `MANUAL-IPHONE-TEST.md`
 - `DEPLOYMENT-ORDER.md`
 
 ## Migration requirements
 
-- Inspect/export the live Worker and D1 schema first.
-- Preserve the live care JSON and version in the new `frannie_care` singleton contract, adapting table names in the Worker if the existing schema differs.
-- Bind the existing D1 database as `DB`.
+- Export the audited live Worker and D1 database before deployment.
+- Preserve the live `care_records` table, its `frannie` singleton record, JSON, and version.
+- Keep the existing D1 binding `CARE_DB`.
 - Set exact `ALLOWED_ORIGINS`.
-- Set `LEGACY_FAMILY_TOKEN` and `ADMIN_RECOVERY_TOKEN` with Worker secret storage, never source control.
+- Preserve `CARE_ACCESS_KEY` and set `ADMIN_RECOVERY_TOKEN` with Worker secret storage, never source control.
 - Keep the legacy secret only during controlled existing-device migration, then remove it.
 
 ## Deployment order

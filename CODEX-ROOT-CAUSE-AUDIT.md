@@ -1,6 +1,6 @@
 # Frannie Codex root-cause audit
 
-Build: `CODEX-v3 · cache v35`  
+Build: `CODEX-v3 Â· cache v35`  
 Source: supplied BTR-v2.2 ZIP, audited August 12, 2026
 
 ## 1. Sitter active state is lost
@@ -45,13 +45,13 @@ Regression risk: a malformed old build that placed historical items in `feedingI
 
 ## 5. Recent Shared Changes
 
-First loss point in the earlier architecture: an activity created during an in-flight sync did not independently require another pass, so it could remain local until some later action. The supplied BTR-v2.2 source already contained the scheduling repair. Static inspection found no later loss point: `activityLog` is normalized, stored, included in the payload, merged by ID without deletion semantics, applied, and rendered.
+Definitive first loss point: the deployed Cloudflare Worker reconstructs each successful PUT through a fixed allowlist. It drops `activityLog`, `selected`, `completed`, `logs`, `profile.goal`, and the sitter activation/ownership fields before writing D1. The live D1 record confirms those keys are absent. Separately, an activity created during an in-flight sync did not independently require another pass, so it could remain local until a later action.
 
 Affected code: `shared-care.js` `onLocalPersist()`, `addActivity()`, `synchronize()`, `renderActivityLog()`; `shared-care-core.js` `mergeActivityLog()`.
 
-Repair/preservation: `addActivity()` saves and renders immediately and schedules or flags another sync. Entries now also contain `deviceId`. Merge remains append-only, de-duplicated by ID, newest-first.
+Repair/preservation: the aligned Worker stores the complete normalized frontend object rather than rebuilding it through an allowlist. `addActivity()` saves and renders immediately and schedules or flags another sync. Entries now also contain `deviceId`. Merge remains append-only, de-duplicated by ID, newest-first.
 
-Why earlier repairs appeared ineffective: actions made by an older cached script could not create records retroactively, and a sync-only scheduling fix could not populate old missing events. Cache v35 coherently versions all live scripts.
+Why earlier repairs appeared ineffective: the live Worker deleted the repaired fields on every write. Actions made by an older cached script also could not create records retroactively, and a sync-only scheduling fix could not populate old missing events. Cache v35 coherently versions all live scripts.
 
 Regression risk: the record is capped at 100 entries by the existing design. That is retention, not an administrative deletion UI.
 
@@ -83,4 +83,4 @@ Affected code: `shared-care.js`; new `worker/` files and D1 migration.
 
 Repair: invite URLs carry only `fi_` one-time tokens. The Worker atomically consumes a valid unexpired invite and returns a random `fd_` device credential. Only credential hashes are stored in D1. Device revocation is enforced server-side. Existing devices exchange the legacy credential for a device credential. A separately held Worker secret can create a recovery invite if all devices are lost.
 
-Regression risk: the supplied ZIP did not include the deployed Worker source or live D1 schema. The replacement Worker preserves the observed `/v1/care` contract, but its `frannie_care` table must be reconciled with the live care table before deployment.
+Regression risk: the deployed Worker and D1 were audited read-only. The replacement now uses the live `CARE_DB` binding, `care_records` table, `frannie` record ID, response shape, and optimistic version contract. Deployment still requires backups, the additive pairing migration, and controlled staging/device tests.

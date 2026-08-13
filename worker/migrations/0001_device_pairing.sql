@@ -1,11 +1,5 @@
-CREATE TABLE IF NOT EXISTS frannie_care (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL,
-  version INTEGER NOT NULL DEFAULT 1,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_by_device_id TEXT
-);
-
+-- Additive migration for the existing frannie-care D1 database.
+-- It deliberately does not alter or copy the live care_records table.
 CREATE TABLE IF NOT EXISTS frannie_devices (
   id TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
