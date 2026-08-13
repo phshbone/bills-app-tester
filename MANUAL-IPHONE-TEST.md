@@ -1,12 +1,12 @@
 # Manual iPhone test sequence
 
-1. **Update/build:** Open the installed app online. In Care -> Manage connection & activity confirm `Build CODEX-v3.2 / cache v37`. If not, stop and resolve the update.
+1. **Update/build:** Open the installed app online. In Care -> Manage connection & activity confirm `Build CODEX-v3.3 / cache v38`. Confirm the Frannie background, splash photograph, Home Screen icon, and Training Video Library are present. If not, stop and resolve the update.
 2. **Pairing:** On an authorized device choose Share one-time invite. Open it on a new iPhone, add to Home Screen if needed, enter only a name/initials, and tap Enter Frannie. Confirm invalid, expired, and already-used copies fail.
 3. **Recovery:** Choose Create / replace recovery link and save it outside the app. Use it twice with the same name in a cleared test profile. Confirm both pairings work, the older same-name device is retired, and an active same-name sitter session follows the recovered device. Create a replacement link and confirm the earlier link stops working.
-3. **Sitter persistence:** On Device A activate directions, sync, close/swipe away the PWA, reopen, and confirm the caretaker alert and End action remain. View/dismiss the alert and confirm active remains true.
-4. **Ownership:** On Device B confirm directions are viewable but editing/ending is blocked. On Device A edit active directions and end them; confirm false on both. Confirm changing a display name does not transfer ownership.
-5. **Medications:** Add A current, add B current, edit B, sync both devices, mark A inactive, and confirm B stays current while A remains in history.
-6. **Feeding:** Add two current items in one category plus items in other categories. Confirm every current item appears in sitter, inactive items do not, and history remains.
-7. **Audit:** Make exactly one Care edit. Confirm exactly one immediate entry with person, device-backed identity, date/time, and description. Sync Device B and confirm exactly one copy survives repeated sync/conflict.
-8. **Checklist/modal:** Enable the temporary checklist, check several rows, wait for sync/rerender, and confirm checks remain during that app session. Close/reopen sitter and video modals repeatedly; confirm no black surface or frozen controls. Kill/reopen and confirm the temporary checklist resets.
-9. **Reopen/update:** Reopen offline once to confirm the shell loads, then online to confirm synchronization and build stamp. Revoke/disconnect a test device and confirm its old credential can no longer write. Pair it again only with a new invite.
+4. **Sitter persistence:** On Device A activate directions, sync, close/swipe away the PWA, reopen, and confirm the caretaker alert and End action remain. View/dismiss the alert and confirm active remains true.
+5. **Ownership:** On Device B confirm directions are viewable but editing/ending is blocked. On Device A edit active directions and end them; confirm false on both. Confirm changing a display name does not transfer ownership.
+6. **Medications:** Add A current, add B current, edit B, sync both devices, mark A inactive, and confirm B stays current while A remains in history.
+7. **Feeding:** Add two current items in one category plus items in other categories. Confirm every current item appears in sitter, inactive items do not, and history remains.
+8. **Audit:** Make exactly one Care edit. Confirm exactly one immediate entry with person, device-backed identity, date/time, and description. Sync Device B and confirm exactly one copy survives repeated sync/conflict.
+9. **Checklist/modal:** Enable the temporary checklist, check several rows, wait for sync/rerender, and confirm checks remain during that app session. Close/reopen sitter and video modals repeatedly; confirm no black surface or frozen controls. Kill/reopen and confirm the temporary checklist resets.
+10. **Reopen/update:** Reopen offline once to confirm the shell loads, then online to confirm synchronization and build stamp. Revoke/disconnect a test device and confirm its old credential can no longer write. Pair it again only with a new invite.

@@ -47,7 +47,7 @@ assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.current
 for(const asset of ["styles.css?v=33","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=17"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v37/,"service worker cache version is v37");
+assert.match(sw,/frannies-good-girl-v38/,"service worker cache version is v38");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
 assert.doesNotMatch(worker,/LEGACY_FAMILY_TOKEN\s*=\s*["']/,"legacy credential is not embedded");
@@ -57,4 +57,17 @@ assert.match(worker,/revoked_at/,"revoked credentials are rejected");
 assert.match(worker,/frannie_recovery_links/,"recovery links are hashed, server-held, and revocable");
 assert.match(worker,/activatedByDeviceId/,"recovery pairing transfers matching active sitter ownership");
 
-console.log("PASS: 27 Frannie state, sync, pairing, recovery, audit, checklist, care UI, and PWA regression assertions");
+const manifest=JSON.parse(fs.readFileSync(new URL("manifest.json",root),"utf8"));
+assert.equal(manifest.display,"standalone","official manifest installs as a standalone PWA");
+assert.equal(manifest.icons.length,2,"official manifest includes both app icon sizes");
+for(const asset of ["assets/frannie-background.webp","assets/frannie-photo.webp","assets/icon-192.png","assets/icon-512.png"]){
+  assert.ok(fs.statSync(new URL(asset,root)).size>50000,`${asset} is present and non-empty`);
+  assert.ok(sw.includes(`./${asset}`),`service worker caches ${asset}`);
+}
+const training=fs.readFileSync(new URL("frannies-training-update.js",root),"utf8");
+assert.match(training,/Training Video Library/,"official training resource library is restored");
+assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video library preserves iPhone modal compositing repair");
+assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
+assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
+
+console.log("PASS: 42 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, care UI, and PWA regression assertions");
