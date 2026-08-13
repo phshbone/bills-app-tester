@@ -9,7 +9,7 @@
   const SYNC_KEY="frannieCareSyncV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="CODEX-v3.2 · cache v37";
+  const BUILD_ID="CODEX-v3.3 · cache v38";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
   const INVITE_COOKIE="franniePendingInviteV1";
