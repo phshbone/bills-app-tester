@@ -20,7 +20,7 @@ Command: `npm test`
 
 - `setNextActivity -> onLocalPersist -> addActivity -> Store.save -> extract -> merge -> applyShared -> renderActivityLog` remains connected.
 - Active sitter editing and ending require the owner device; viewing does not.
-- Cache `v38` and query versions (`app/styles 33`, shared scripts 17, training interface 2) agree.
+- Cache `v38` and query versions (`app/styles 33`, shared core 17, shared UI 18, training interface 2) agree.
 - Old caches are deleted; core files use network-first with cached fallback.
 - Pairing tokens are temporary; device credentials stay in local storage and D1 stores only hashes.
 - No Cloudflare deployment, live D1 mutation, Worker setting change, or secret creation was performed.
