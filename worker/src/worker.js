@@ -79,11 +79,35 @@ async function createInvite(request,env){
   return {inviteToken,expiresAt:new Date(Date.now()+minutes*60000).toISOString()};
 }
 
+async function createRecoveryLink(request,env){
+  const actor=await authorize(request,env,{allowLegacy:false});
+  const recoveryToken=token("fa_");
+  const recoveryHash=await digest(recoveryToken);
+  const id=crypto.randomUUID();
+  await env.CARE_DB.prepare("UPDATE frannie_recovery_links SET revoked_at = CURRENT_TIMESTAMP WHERE revoked_at IS NULL").run();
+  await env.CARE_DB.prepare("INSERT INTO frannie_recovery_links (id, token_hash, created_by_device_id) VALUES (?, ?, ?)").bind(id,recoveryHash,actor.id).run();
+  return {recoveryToken,recoveryLinkId:id};
+}
+
+async function pairFromRecoveryLink(env,recoveryToken,displayName){
+  const link=await env.CARE_DB.prepare("SELECT id, revoked_at FROM frannie_recovery_links WHERE token_hash = ?").bind(await digest(recoveryToken)).first();
+  if(!link)throw new HttpError(404,"Family recovery link not found");
+  if(link.revoked_at)throw new HttpError(410,"Family recovery link was replaced or revoked");
+  await env.CARE_DB.prepare("UPDATE frannie_recovery_links SET last_used_at = CURRENT_TIMESTAMP, use_count = use_count + 1 WHERE id = ? AND revoked_at IS NULL").bind(link.id).run();
+  const result=await createDevice(env,displayName);
+  // Reinstalling as the same named family member replaces abandoned device
+  // credentials and hands any active sitter session to the new device.
+  await env.CARE_DB.prepare("UPDATE frannie_devices SET revoked_at = CURRENT_TIMESTAMP WHERE lower(display_name) = lower(?) AND id <> ? AND revoked_at IS NULL").bind(displayName,result.device.id).run();
+  await env.CARE_DB.prepare("UPDATE care_records SET data = json_set(data, '$.sitter.activatedByDeviceId', ?), version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND json_extract(data, '$.sitter.active') = 1 AND lower(json_extract(data, '$.sitter.activatedBy')) = lower(?)").bind(result.device.id,CARE_RECORD_ID,displayName).run();
+  return {...result,recovered:true};
+}
+
 async function pair(request,env){
   const input=await body(request);
   const inviteToken=String(input.inviteToken||"").trim();
   const displayName=String(input.displayName||"").trim().slice(0,60);
   if(!inviteToken||!displayName)throw new HttpError(400,"Invite token and display name are required");
+  if(inviteToken.startsWith("fa_"))return pairFromRecoveryLink(env,inviteToken,displayName);
   const hash=await digest(inviteToken);
   const invite=await env.CARE_DB.prepare("SELECT id, expires_at, used_at FROM frannie_invites WHERE token_hash = ?").bind(hash).first();
   if(!invite)throw new HttpError(404,"Invite not found");
@@ -106,6 +130,7 @@ async function route(request,env){
   if(key==="POST /v1/pair")return reply(await pair(request,env),201);
   if(key==="POST /v1/admin/recovery-invite")return reply(await adminInvite(request,env),201);
   if(key==="POST /v1/invites")return reply(await createInvite(request,env),201);
+  if(key==="POST /v1/recovery-links")return reply(await createRecoveryLink(request,env),201);
   if(key==="POST /v1/devices/migrate"){
     const actor=await authorize(request,env);
     if(!actor.legacy)throw new HttpError(409,"This device already has a device credential");

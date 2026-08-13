@@ -9,7 +9,7 @@
   const SYNC_KEY="frannieCareSyncV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="CODEX-v3.1 · cache v36";
+  const BUILD_ID="CODEX-v3.2 · cache v37";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
   const INVITE_COOKIE="franniePendingInviteV1";
@@ -529,16 +529,35 @@
     catch{prompt("Copy this Frannie setup link:",text)}
   }
 
+  async function shareRecoveryLink(){
+    if(!connectionCode){alert("This device is not connected to Frannie yet.");return}
+    if(!confirm("Create a reusable Family Recovery Link? Any previous recovery link will stop working. Keep the new link private; it can reconnect a deleted or reinstalled Frannie app."))return;
+    let recovery;
+    try{recovery=await request("/v1/recovery-links",{method:"POST",body:"{}"})}
+    catch(error){alert("A Family Recovery Link could not be created. Check the shared connection and try again.");return}
+    const url=new URL(location.href);
+    url.search="";url.hash="";url.searchParams.set("invite",recovery.recoveryToken);
+    const text=url.toString();
+    if(navigator.share){
+      try{await navigator.share({title:"Frannie Family Recovery Link",text:"Keep this private. Use it to reconnect your own Frannie app after reinstalling.",url:text});return}
+      catch(error){if(error?.name==="AbortError")return}
+    }
+    try{await navigator.clipboard.writeText(text);alert("The reusable Family Recovery Link was copied. Save it somewhere private. It keeps working until you replace it.")}
+    catch{prompt("Copy and privately save this reusable Family Recovery Link:",text)}
+  }
+
   function renderConnectionControls(){
     const connectButton=document.getElementById("cloudCareConnect");
     const syncButton=document.getElementById("cloudCareSync");
     const disconnectButton=document.getElementById("cloudCareDisconnect");
     const setupButton=document.getElementById("cloudCareShareSetup");
+    const recoveryButton=document.getElementById("cloudCareRecoveryLink");
     const badge=document.getElementById("cloudCareUserBadge");
     if(connectButton)connectButton.classList.toggle("hidden",Boolean(connectionCode));
     if(syncButton)syncButton.classList.toggle("hidden",!connectionCode);
     if(disconnectButton)disconnectButton.classList.toggle("hidden",!connectionCode);
     if(setupButton)setupButton.classList.toggle("hidden",!connectionCode);
+    if(recoveryButton)recoveryButton.classList.toggle("hidden",!connectionCode);
     if(badge){
       badge.textContent=userName||"";
       badge.classList.toggle("hidden",!connectionCode||!userName);
@@ -748,7 +767,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — open a one-time Frannie invite"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Manage connection & activity</summary><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Enter Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share one-time invite</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect this device</button></div><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — open a Frannie invitation or recovery link"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Manage connection & activity</summary><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Enter Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share one-time invite</button><button id="cloudCareRecoveryLink" class="secondary hidden" type="button">Create / replace recovery link</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect this device</button></div><p class="care-recovery-note">A private Family Recovery Link can reconnect your own app after it is deleted or reinstalled. Save it outside the app. It works repeatedly until you replace it.</p><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
     intro?.after(cloud);
 
     const jumpNav=document.createElement("nav");
@@ -828,7 +847,8 @@
         else{closeConnectionSetup();setTimeout(()=>alert("Open a current one-time Frannie invite on this device first."),0);return}
         renderConnectionControls();renderIdentityControls();closeConnectionSetup();await synchronize({forcePull:true});
       }catch(error){
-        const message=error.status===410?"This invite has expired or was already used. Ask a connected family member for a new one.":error.status===404?"This invite is not valid. Ask for a new Frannie invite.":"Frannie could not pair this device. Check the connection and try again.";
+        const recovery=pendingInvite.startsWith("fa_");
+        const message=error.status===410?(recovery?"This Family Recovery Link was replaced. Use the newest saved recovery link.":"This invite has expired or was already used. Ask a connected family member for a new one."):error.status===404?(recovery?"This Family Recovery Link is not valid. Use the newest saved recovery link.":"This invite is not valid. Ask for a new Frannie invite."):"Frannie could not pair this device. Check the connection and try again.";
         closeConnectionSetup();setTimeout(()=>alert(message),0);
       }
     };
@@ -843,6 +863,7 @@
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
     document.getElementById("cloudCareSync").addEventListener("click",()=>synchronize());
     document.getElementById("cloudCareShareSetup").addEventListener("click",shareSetupLink);
+    document.getElementById("cloudCareRecoveryLink").addEventListener("click",shareRecoveryLink);
     document.getElementById("cloudCareDisconnect").addEventListener("click",disconnect);
     document.getElementById("saveSitterInstructions").addEventListener("click",saveSitterInstructions);
     document.getElementById("activateSitterInstructions").addEventListener("click",activateSitterInstructions);

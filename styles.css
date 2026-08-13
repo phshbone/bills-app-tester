@@ -360,6 +360,7 @@ html.install-required .install-curtain{
 .care-user-badge{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:42px;max-width:120px;padding:7px 10px;border-radius:999px;background:#875363;color:#fff;font-size:.78rem;font-weight:950;letter-spacing:.035em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .care-cloud-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
 .care-cloud-actions button{min-height:auto;padding:9px 13px}
+.care-recovery-note{margin:10px 0 0;font-size:.84rem;line-height:1.4;color:var(--muted)}
 .care-connection-details{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
 .care-connection-details>summary{cursor:pointer;font-weight:900;color:#704753}
 .care-connection-details>.care-cloud-identity{margin-top:10px}
