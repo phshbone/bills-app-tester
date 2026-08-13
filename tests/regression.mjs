@@ -33,13 +33,19 @@ assert.match(shared,/currentFood=.*filter\(item=>item\.active===true\)/,"sitter 
 assert.match(shared,/sitterChecklistChecks=new Set\(\)/,"checklist state is session-only");
 assert.doesNotMatch(shared,/searchParams\.set\("(?:connect|invite)",connectionCode\)/,"permanent credentials are never put in invite URLs");
 assert.doesNotMatch(shared,/document\.body\.style\.overflow/,"sitter/connection modals do not mutate body overflow");
+assert.match(shared,/Manage connection & activity[\s\S]*care-cloud-actions/,"connection controls live inside the collapsible details panel");
+assert.match(shared,/closeConnectionSetup\(\);setTimeout\(\(\)=>alert/,"connection errors release the dimming modal before showing an alert");
 
 const html=fs.readFileSync(new URL("index.html",root),"utf8");
 const sw=fs.readFileSync(new URL("sw.js",root),"utf8");
-for(const asset of ["styles.css?v=31","app.js?v=31","shared-care-core.js?v=15","shared-care.js?v=15"]){
+const app=fs.readFileSync(new URL("app.js",root),"utf8");
+assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
+assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
+assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
+for(const asset of ["styles.css?v=32","app.js?v=32","shared-care-core.js?v=16","shared-care.js?v=16"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v35/,"service worker cache version is v35");
+assert.match(sw,/frannies-good-girl-v36/,"service worker cache version is v36");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
 assert.doesNotMatch(worker,/LEGACY_FAMILY_TOKEN\s*=\s*["']/,"legacy credential is not embedded");
@@ -47,4 +53,4 @@ assert.match(worker,/credential_hash/,"device credentials are stored by hash");
 assert.match(worker,/used_at IS NULL AND expires_at > CURRENT_TIMESTAMP/,"invite claim is single-use and expiry checked");
 assert.match(worker,/revoked_at/,"revoked credentials are rejected");
 
-console.log("PASS: 18 Frannie state, sync, pairing, audit, checklist, and PWA regression assertions");
+console.log("PASS: 23 Frannie state, sync, pairing, audit, checklist, care UI, and PWA regression assertions");

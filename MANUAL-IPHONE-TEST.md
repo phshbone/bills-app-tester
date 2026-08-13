@@ -1,6 +1,6 @@
 # Manual iPhone test sequence
 
-1. **Update/build:** Open the installed app online. In Care → Connection & activity confirm `Build CODEX-v3 · cache v35`. If not, stop and resolve the update.
+1. **Update/build:** Open the installed app online. In Care -> Manage connection & activity confirm `Build CODEX-v3.1 / cache v36`. If not, stop and resolve the update.
 2. **Pairing:** On an authorized device choose Share one-time invite. Open it on a new iPhone, add to Home Screen if needed, enter only a name/initials, and tap Enter Frannie. Confirm invalid, expired, and already-used copies fail.
 3. **Sitter persistence:** On Device A activate directions, sync, close/swipe away the PWA, reopen, and confirm the caretaker alert and End action remain. View/dismiss the alert and confirm active remains true.
 4. **Ownership:** On Device B confirm directions are viewable but editing/ending is blocked. On Device A edit active directions and end them; confirm false on both. Confirm changing a display name does not transfer ownership.

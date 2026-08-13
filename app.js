@@ -152,6 +152,9 @@ function showScreen(id,btn){
   document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
   if(btn)btn.classList.add("active");
   else{const map={home:0,care:1,plan:2,log:3,safety:4};if(map[id]!==undefined)document.querySelectorAll(".nav")[map[id]].classList.add("active")}
+  // Clear the pressed/focused button after navigation. iOS can otherwise
+  // leave a fixed compositing layer looking dim until the next touch.
+  document.activeElement?.blur?.();
   const scroller=document.querySelector(".app");
   if(scroller){scroller.scrollTop=0;requestAnimationFrame(()=>{scroller.scrollTop=0})}
 }
@@ -180,7 +183,7 @@ if(sessionStorage.getItem("frannieSplashSeen")==="1"){
   splashTimer=setTimeout(dismissSplash,3000);
 }
 
-function treatmentStatus(x){if(x.type==="Medication"&&!x.due)return["Ongoing","status-ongoing"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
+function treatmentStatus(x){if(x.type==="Medication")return x.active===true?["Ongoing","status-ongoing"]:["Ended","status-ended"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
 function saveTreatment(){const name=$("treatmentName").value.trim();if(!name){alert("Add a treatment or vaccination name.");return}const type=$("treatmentType").value;const item={id:editing.treatment||uid(),type,name,date:$("treatmentDate").value,due:$("treatmentDue").value,note:$("treatmentNote").value.trim(),...(type==="Medication"?{active:Boolean($("treatmentActive")?.checked)}:{})};if(editing.treatment){state.treatments=state.treatments.map(x=>x.id===editing.treatment?item:x);window.FrannieCloudSync?.setNextActivity?.(`Edited treatment / vaccination: ${item.name}`);}else{state.treatments.unshift(item);window.FrannieCloudSync?.setNextActivity?.(`Added treatment / vaccination: ${item.name}`);}persist();cancelTreatmentEdit();renderCare();renderMainLog()}
 function editTreatment(id){const x=state.treatments.find(v=>v.id===id);if(!x)return;editing.treatment=id;$("treatmentType").value=x.type;$("treatmentName").value=x.name;$("treatmentDate").value=x.date||"";$("treatmentDue").value=x.due||"";$("treatmentNote").value=x.note||"";if($("treatmentActive"))$("treatmentActive").checked=x.type==="Medication"?x.active!==false:true;updateTreatmentActiveVisibility();setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",true,"Add treatment","Save changes");$("treatmentName").focus()}
 function updateTreatmentActiveVisibility(){const row=$("treatmentActiveRow");if(!row)return;const isMedication=$("treatmentType")?.value==="Medication";row.classList.toggle("hidden",!isMedication);if(isMedication&&!editing.treatment&&$("treatmentActive"))$("treatmentActive").checked=true} function cancelTreatmentEdit(){editing.treatment=null;$("treatmentType").value="Vaccination";$("treatmentName").value="";$("treatmentDate").value=todayISO();$("treatmentDue").value="";$("treatmentNote").value="";if($("treatmentActive"))$("treatmentActive").checked=true;updateTreatmentActiveVisibility();setButtonEdit("treatmentSaveBtn","treatmentCancelBtn",false,"Add treatment","Save changes")}
@@ -244,6 +247,13 @@ function activeHistoryHtml(items,renderItem,label){
   const previous=items.filter(item=>item.active!==true);
   return current.map(renderItem).join("")+(previous.length?careHistoryToggleHtml(previous,renderItem,label):"");
 }
+function treatmentHistoryHtml(items,renderItem){
+  if(!items.length)return "";
+  const currentMedications=items.filter(item=>item.type==="Medication"&&item.active===true);
+  const otherTreatments=items.filter(item=>!(item.type==="Medication"&&item.active===true));
+  const visible=[...currentMedications,...otherTreatments.slice(0,1)];
+  return visible.map(renderItem).join("")+(otherTreatments.length>1?careHistoryToggleHtml(otherTreatments.slice(1),renderItem,"treatments"):"");
+}
 function renderFeeding(){
   const el=$("feedingList");
   const renderItem=x=>`<div class="entry ${x.active===true?"current-entry":""}"><div class="entry-top"><div><span class="status-tag status-ongoing">${esc(x.category||"Other")}</span>${x.active===true?'<span class="current-badge">Current</span>':""}<strong style="display:block;margin-top:6px">${esc(x.brand)}</strong>${x.amount?`<small>Amount: ${esc(x.amount)}</small>`:""}${x.schedule?`<small>When: ${esc(x.schedule)}</small>`:""}${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><button class="remove-btn" onclick="editFeeding('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeFeeding('${x.id}')">Remove</button></div></div></div>`;
@@ -275,9 +285,11 @@ function renderTreatments(){
   const renderItem=x=>{
     const s=treatmentStatus(x);
     const currentMedication=x.type==="Medication"&&x.active===true;
-    return`<div class="entry ${currentMedication?"current-entry":""}"><div class="entry-top"><div><strong>${esc(x.name)}</strong>${currentMedication?'<span class="current-badge">Current</span>':""}<small>${esc(x.type)}${x.date?" · Given "+prettyDate(x.date):""}${x.due?" · Next "+prettyDate(x.due):""}</small>${x.note?`<small>${esc(x.note)}</small>`:""}</div><div><span class="status-tag ${s[1]}">${s[0]}</span><br><button class="remove-btn" onclick="editTreatment('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeTreatment('${x.id}')">Remove</button></div></div></div>`
+    const dateLabel=x.type==="Medication"?"Started":"Given";
+    const dueLabel=x.type==="Medication"?"Ends":"Next";
+    return`<div class="entry ${currentMedication?"current-entry":""}"><div class="entry-top"><div class="entry-copy"><strong>${esc(x.name)}</strong>${currentMedication?'<span class="current-badge">Current</span>':""}<small>${esc(x.type)}${x.date?` · ${dateLabel} `+prettyDate(x.date):""}${x.due?` · ${dueLabel} `+prettyDate(x.due):""}</small>${x.note?`<small>${esc(x.note)}</small>`:""}</div><div class="entry-controls"><span class="status-tag ${s[1]}">${s[0]}</span><div class="entry-actions"><button class="remove-btn" onclick="editTreatment('${x.id}')">Edit</button><button class="remove-btn" onclick="removeTreatment('${x.id}')">Remove</button></div></div></div></div>`
   };
-  $("treatmentList").innerHTML=state.treatments.length?collapsedHistoryHtml(state.treatments,renderItem,"treatments"):"<p>No treatments or vaccinations added yet.</p>";
+  $("treatmentList").innerHTML=state.treatments.length?treatmentHistoryHtml(state.treatments,renderItem):"<p>No treatments or vaccinations added yet.</p>";
 }
 function renderAllergies(){const renderItem=x=>`<div class="entry"><div class="entry-top"><strong>${esc(x.text)}</strong><div><button class="remove-btn" onclick="editAllergy('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeAllergy('${x.id}')">Remove</button></div></div></div>`;$("allergyList").innerHTML=state.allergies.length?collapsedHistoryHtml(state.allergies,renderItem,"cautions"):"<p>No allergies or cautions added yet.</p>"}
 function renderHeights(){const renderItem=x=>`<div class="entry"><div class="entry-top"><div><strong>${esc(x.value)}</strong><small>${prettyDate(x.date)}${x.note?" · "+esc(x.note):""}</small></div><div><button class="remove-btn" onclick="editHeight('${x.id}')">Edit</button> <button class="remove-btn" onclick="removeHeight('${x.id}')">Remove</button></div></div></div>`;$("heightList").innerHTML=state.heights.length?collapsedHistoryHtml(state.heights,renderItem,"heights"):"<p>No height entries yet.</p>"}

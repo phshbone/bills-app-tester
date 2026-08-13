@@ -1,6 +1,6 @@
 # Frannie Codex root-cause audit
 
-Build: `CODEX-v3 / cache v35`  
+Build: `CODEX-v3.1 / cache v36`  
 Source: supplied BTR-v2.2 ZIP, audited August 12, 2026
 
 ## 1. Sitter active state is lost
@@ -51,7 +51,7 @@ Affected code: `shared-care.js` `onLocalPersist()`, `addActivity()`, `synchroniz
 
 Repair/preservation: the aligned Worker stores the complete normalized frontend object rather than rebuilding it through an allowlist. `addActivity()` saves and renders immediately and schedules or flags another sync. Entries now also contain `deviceId`. Merge remains append-only, de-duplicated by ID, newest-first.
 
-Why earlier repairs appeared ineffective: the live Worker deleted the repaired fields on every write. Actions made by an older cached script also could not create records retroactively, and a sync-only scheduling fix could not populate old missing events. Cache v35 coherently versions all live scripts.
+Why earlier repairs appeared ineffective: the live Worker deleted the repaired fields on every write. Actions made by an older cached script also could not create records retroactively, and a sync-only scheduling fix could not populate old missing events. Cache v36 coherently versions all live scripts.
 
 Regression risk: the record is capped at 100 entries by the existing design. That is retention, not an administrative deletion UI.
 
