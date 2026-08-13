@@ -1,6 +1,6 @@
 # Frannie Codex root-cause audit
 
-Build: `CODEX-v3 Â· cache v35`  
+Build: `CODEX-v3 / cache v35`  
 Source: supplied BTR-v2.2 ZIP, audited August 12, 2026
 
 ## 1. Sitter active state is lost

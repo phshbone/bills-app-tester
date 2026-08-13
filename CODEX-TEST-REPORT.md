@@ -18,7 +18,7 @@ Command: `npm test`
 
 ## STATICALLY CHECKED
 
-- `setNextActivity â†’ onLocalPersist â†’ addActivity â†’ Store.save â†’ extract â†’ merge â†’ applyShared â†’ renderActivityLog` remains connected.
+- `setNextActivity -> onLocalPersist -> addActivity -> Store.save -> extract -> merge -> applyShared -> renderActivityLog` remains connected.
 - Active sitter editing and ending require the owner device; viewing does not.
 - Cache `v35` and query versions (`app/styles 31`, shared scripts 15) agree.
 - Old caches are deleted; core files use network-first with cached fallback.
@@ -27,7 +27,7 @@ Command: `npm test`
 
 ## REAL-DEVICE TEST REQUIRED
 
-- Safari invite â†’ Add to Home Screen â†’ standalone PWA token handoff.
+- Safari invite -> Add to Home Screen -> standalone PWA token handoff.
 - Kill/reopen installed iPhone PWA and caretaker alert reappearance.
 - iOS WebKit modal/checklist behavior and absence of black surface/freeze.
 - Service-worker update arrival on an already installed PWA.
