@@ -1,0 +1,15 @@
+name = "frannie-care"
+main = "src/worker.js"
+compatibility_date = "2026-08-13"
+
+[[d1_databases]]
+binding = "CARE_DB"
+database_name = "frannie-care"
+database_id = "a8aa46e3-28c0-443b-8b63-acd2f8ecb77f"
+
+[vars]
+ALLOWED_ORIGINS = "https://phshbone.github.io,http://127.0.0.1:8788,http://localhost:8788"
+
+# Set these with `wrangler secret put`, never in this file:
+# CARE_ACCESS_KEY      existing family credential, temporary migration bridge
+# ADMIN_RECOVERY_TOKEN random offline-held recovery credential

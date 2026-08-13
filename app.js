@@ -28,19 +28,10 @@ const $=id=>document.getElementById(id);
 
 function normalizeFeedingItems(items){
   const list=Array.isArray(items)?items.map(item=>({...item})):[];
-  // If this dataset already has explicit current flags, respect them exactly.
-  if(list.some(item=>typeof item.active==="boolean")){
-    return list.map(item=>({...item,active:Boolean(item.active)}));
-  }
-  // One-time migration for older builds: keep the newest item in each category current.
-  // The user can then explicitly mark any additional simultaneous items current.
-  const seen=new Set();
-  return list.map(item=>{
-    const category=item.category||"Other";
-    const active=!seen.has(category);
-    seen.add(category);
-    return {...item,active};
-  });
+  // feedingItems was the legacy current list; feedingHistory held old items.
+  // Preserve every explicit flag and migrate only missing flags to current.
+  // This also handles partially upgraded state without collapsing a category.
+  return list.map(item=>({...item,active:typeof item.active==="boolean"?item.active:true}));
 }
 function normalizeTreatments(items){
   const list=Array.isArray(items)?items.map(item=>({...item})):[];
@@ -54,7 +45,7 @@ function normalizeTreatments(items){
 }
 
 function defaultState(){
-  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""}};
+  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:"",activatedByDeviceId:"",sessionId:""}};
 }
 function normalizeState(raw){
   const base=defaultState();
@@ -74,7 +65,7 @@ function normalizeState(raw){
     weights:Array.isArray(raw.weights)?raw.weights:[],
     heights:Array.isArray(raw.heights)?raw.heights:[],
     careNotes:Array.isArray(raw.careNotes)?raw.careNotes:[],
-    sitter:raw.sitter&&typeof raw.sitter==="object"?raw.sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:""},
+    sitter:raw.sitter&&typeof raw.sitter==="object"?{...base.sitter,...raw.sitter,active:Boolean(raw.sitter.active)}:base.sitter,
     feeding:null,
     feedingItems:normalizeFeedingItems(Array.isArray(raw.feedingItems)?raw.feedingItems:(raw.feeding&&typeof raw.feeding==="object"?[{
       id:raw.feeding.id||"feeding-legacy",
@@ -168,8 +159,8 @@ function renderTimer(){$("timer").textContent=String(Math.floor(seconds/60)).pad
 function startTimer(){if(ticker)return;ticker=setInterval(()=>{if(seconds>0){seconds--;renderTimer()}else{pauseTimer();alert("Session complete. Finish with an easy success if possible.")}},1000)}
 function pauseTimer(){clearInterval(ticker);ticker=null}
 function resetTimer(){pauseTimer();seconds=lessons[current].minutes*60;renderTimer()}
-function openVideo(){const l=lessons[current];$("modalTitle").textContent=l.videoTitle;$("youtubeFallback").href=`https://www.youtube.com/watch?v=${l.videoId}`;$("videoFrame").innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${l.videoId}?autoplay=1&rel=0&playsinline=1" title="${esc(l.videoTitle)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;$("videoModal").classList.add("open");document.body.style.overflow="hidden"}
-function closeVideo(){$("videoModal").classList.remove("open");$("videoFrame").innerHTML="";document.body.style.overflow=""}
+function openVideo(){const l=lessons[current];$("modalTitle").textContent=l.videoTitle;$("youtubeFallback").href=`https://www.youtube.com/watch?v=${l.videoId}`;$("videoFrame").innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${l.videoId}?autoplay=1&rel=0&playsinline=1" title="${esc(l.videoTitle)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;$("videoModal").classList.add("open")}
+function closeVideo(){$("videoModal").classList.remove("open");$("videoFrame").innerHTML=""}
 function modalBackdrop(e){if(e.target===$("videoModal"))closeVideo()}
 function resetApp(){if(confirm("Erase Frannie’s saved profile, progress and logs?")){Store.clear();location.reload()}}
 let splashTimer=null;

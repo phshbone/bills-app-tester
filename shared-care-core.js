@@ -4,7 +4,7 @@
   const OBJECT_ARRAY_FIELDS=["logs","treatments","treatmentHistory","careHistory","allergies","weights","heights","careNotes","feedingItems","feedingHistory","activityLog"];
   const PRIMITIVE_ARRAY_FIELDS=["selected","completed"];
   const ARRAY_FIELDS=[...PRIMITIVE_ARRAY_FIELDS,...OBJECT_ARRAY_FIELDS];
-  const SITTER_TEXT_FIELDS=["pottyRoutine","crateSleep","emergencyVet","instructions","activatedAt","activatedBy"];
+  const SITTER_TEXT_FIELDS=["pottyRoutine","crateSleep","emergencyVet","instructions","activatedAt","activatedBy","activatedByDeviceId","sessionId"];
   const SITTER_FIELDS=[...SITTER_TEXT_FIELDS,"active"];
 
   function isObject(value){return Boolean(value)&&typeof value==="object"&&!Array.isArray(value)}
