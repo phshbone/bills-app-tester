@@ -6,7 +6,7 @@
 4. Preserve the existing D1 binding `CARE_DB` and current `ALLOWED_ORIGINS`.
 5. Preserve `CARE_ACCESS_KEY`; generate/store a separate offline `ADMIN_RECOVERY_TOKEN`.
 6. Deploy the Worker and verify legacy `GET/PUT /v1/care`, invite creation, pairing, and revocation in staging or a controlled test.
-7. Deploy the six frontend replacement files. Verify `Care -> Connection & activity -> Build CODEX-v3 / cache v35`.
+7. Deploy the six frontend replacement files. Verify `Care -> Manage connection & activity -> Build CODEX-v3.1 / cache v36`.
 8. Let each existing family device sync once so it exchanges the legacy credential for an `fd_` device credential.
 9. Complete the iPhone sequence and two-device audit/sitter checks.
 10. After every expected existing device has migrated and recovery is verified, remove `CARE_ACCESS_KEY` from the Worker.

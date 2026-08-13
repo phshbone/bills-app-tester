@@ -3,7 +3,7 @@
 ## PROVEN
 
 - JavaScript syntax passes for `app.js`, `shared-care-core.js`, `shared-care.js`, `sw.js`, and `worker/src/worker.js`.
-- 18 executable state/structure assertions pass: sitter merge persistence, owner/session fields, two simultaneous medications, two same-category current foods, append-only audit union, audit de-duplication, all-current sitter filters, session-only checklist, no credential in invite URL, simplified modal state, and PWA asset/cache alignment.
+- 23 executable state/structure assertions pass: sitter merge persistence, owner/session fields, multiple current medications/foods, append-only audit union, all-current sitter filters, session-only checklist, secure invite URLs, compact connection controls, explicit medication status, separated treatment actions, iPhone modal cleanup, and PWA asset/cache alignment.
 - 16 simulated Worker assertions pass: live health compatibility, valid invite, device credential issuance, used invite rejection, invalid invite rejection, complete shared-state persistence, stale-version conflict, revocation, rejected revoked credential, and administrative recovery invite.
 - No permanent family or device credential is included in source, HTML, or the invite URL implementation.
 
@@ -20,7 +20,7 @@ Command: `npm test`
 
 - `setNextActivity -> onLocalPersist -> addActivity -> Store.save -> extract -> merge -> applyShared -> renderActivityLog` remains connected.
 - Active sitter editing and ending require the owner device; viewing does not.
-- Cache `v35` and query versions (`app/styles 31`, shared scripts 15) agree.
+- Cache `v36` and query versions (`app/styles 32`, shared scripts 16) agree.
 - Old caches are deleted; core files use network-first with cached fallback.
 - Pairing tokens are temporary; device credentials stay in local storage and D1 stores only hashes.
 - No Cloudflare deployment, live D1 mutation, Worker setting change, or secret creation was performed.
@@ -36,4 +36,4 @@ Command: `npm test`
 
 ## Result
 
-Automated/simulated checks: **34 passed**. Syntax checks: **5 passed**. Real-device checks remain mandatory and are not claimed as passed.
+Automated/simulated checks: **39 passed**. Syntax checks: **5 passed**. Real-device checks remain mandatory and are not claimed as passed.

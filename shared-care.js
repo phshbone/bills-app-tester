@@ -9,7 +9,7 @@
   const SYNC_KEY="frannieCareSyncV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="CODEX-v3 · cache v35";
+  const BUILD_ID="CODEX-v3.1 · cache v36";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
   const INVITE_COOKIE="franniePendingInviteV1";
@@ -710,6 +710,7 @@
   function releaseModalState(){
     // The app shell already owns scrolling. Modals only toggle their open
     // class, avoiding body-style/compositing churn in iOS WebKit.
+    document.activeElement?.blur?.();
   }
   function openSitter(){renderSitterView();document.getElementById("sitterModal")?.classList.add("open")}
   function closeSitter(){document.getElementById("sitterModal")?.classList.remove("open");releaseModalState()}
@@ -747,7 +748,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — open a one-time Frannie invite"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Enter Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share one-time invite</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect this device</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — open a one-time Frannie invite"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Manage connection & activity</summary><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Enter Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share one-time invite</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect this device</button></div><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
     intro?.after(cloud);
 
     const jumpNav=document.createElement("nav");
@@ -824,11 +825,11 @@
       try{
         if(pendingInvite){await pairDevice(name)}
         else if(connectionCode){userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);await connect(connectionCode)}
-        else{alert("Open a current one-time Frannie invite on this device first.");return}
+        else{closeConnectionSetup();setTimeout(()=>alert("Open a current one-time Frannie invite on this device first."),0);return}
         renderConnectionControls();renderIdentityControls();closeConnectionSetup();await synchronize({forcePull:true});
       }catch(error){
         const message=error.status===410?"This invite has expired or was already used. Ask a connected family member for a new one.":error.status===404?"This invite is not valid. Ask for a new Frannie invite.":"Frannie could not pair this device. Check the connection and try again.";
-        alert(message);
+        closeConnectionSetup();setTimeout(()=>alert(message),0);
       }
     };
 
