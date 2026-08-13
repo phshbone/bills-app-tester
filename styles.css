@@ -181,6 +181,7 @@ html,body{
   min-height:100%;
   overflow:hidden !important;
 }
+html{background:#1b1719}
 body{
   position:fixed;
   inset:0;
