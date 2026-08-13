@@ -1,0 +1,15 @@
+name = "frannie-care"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "REPLACE_WITH_EXISTING_D1_NAME"
+database_id = "REPLACE_WITH_EXISTING_D1_ID"
+
+[vars]
+ALLOWED_ORIGINS = "https://REPLACE_WITH_YOUR_PWA_ORIGIN"
+
+# Set these with `wrangler secret put`, never in this file:
+# LEGACY_FAMILY_TOKEN   existing family credential, temporary migration bridge
+# ADMIN_RECOVERY_TOKEN random offline-held recovery credential

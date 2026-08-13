@@ -3,12 +3,16 @@
 
   const ENDPOINT="https://frannie-care.phshbone.workers.dev";
   const CONNECTION_KEY="frannieCareConnectionV1";
+  const DEVICE_KEY="frannieCareDeviceV1";
+  const LOCAL_DEVICE_KEY="frannieCareLocalDeviceIdV1";
+  const INVITE_KEY="franniePendingInviteV1";
   const SYNC_KEY="frannieCareSyncV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="BTR-v2.2 · cache v34";
+  const BUILD_ID="CODEX-v3 · cache v35";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
+  const INVITE_COOKIE="franniePendingInviteV1";
   const core=globalThis.FrannieCareCore;
 
   function readCookie(name){
@@ -28,25 +32,19 @@
     return Boolean(window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone===true);
   }
 
-  function setupCodeFromUrl(){
+  function inviteFromUrl(){
     try{
       const url=new URL(location.href);
-      const code=(url.searchParams.get("connect")||"").trim();
-      if(!code)return "";
-      // Keep the token on the Safari URL while Add to Home Screen happens.
-      // The standalone PWA consumes it and removes it from its visible URL.
-      if(isStandaloneApp()){
-        url.searchParams.delete("connect");
-        history.replaceState(null,"",url.pathname+url.search+url.hash);
-      }
-      return code;
+      return (url.searchParams.get("invite")||"").trim();
     }catch{return ""}
   }
 
-  const provisionedCode=setupCodeFromUrl();
-  if(provisionedCode){
-    localStorage.setItem(CONNECTION_KEY,provisionedCode);
-    writeCookie(CONNECTION_COOKIE,provisionedCode);
+  const urlInvite=inviteFromUrl();
+  if(urlInvite){
+    // This is a temporary, single-use exchange token, never the family or
+    // device credential. The cookie bridges Safari -> installed iOS PWA.
+    localStorage.setItem(INVITE_KEY,urlInvite);
+    writeCookie(INVITE_COOKIE,urlInvite);
   }
 
   let connectionCode=localStorage.getItem(CONNECTION_KEY)||readCookie(CONNECTION_COOKIE)||"";
@@ -54,7 +52,11 @@
   let syncMeta=loadSyncMeta();
   let userName=(localStorage.getItem(USER_KEY)||readCookie(USER_COOKIE)||"").trim();
   if(userName)localStorage.setItem(USER_KEY,userName);
-  let needsIdentitySetup=Boolean(connectionCode&&!userName);
+  let pendingInvite=(urlInvite||localStorage.getItem(INVITE_KEY)||readCookie(INVITE_COOKIE)||"").trim();
+  let deviceInfo=loadDeviceInfo();
+  let localDeviceId=localStorage.getItem(LOCAL_DEVICE_KEY)||"";
+  if(!localDeviceId){localDeviceId=(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2));localStorage.setItem(LOCAL_DEVICE_KEY,localDeviceId)}
+  let needsIdentitySetup=Boolean((connectionCode&&!userName)||(!connectionCode&&pendingInvite));
   let syncTimer=null;
   let syncing=false;
   let syncAgain=false;
@@ -85,6 +87,11 @@
 
   function canEndSitter(){
     if(!state.sitter?.active)return false;
+    const ownerDevice=(state.sitter?.activatedByDeviceId||"").trim();
+    const thisDeviceIds=[deviceInfo?.id,localDeviceId].map(value=>String(value||"").trim()).filter(Boolean);
+    if(ownerDevice)return thisDeviceIds.includes(ownerDevice);
+    // Legacy active sessions did not have a device owner. Retain the old name
+    // check only for those sessions so an upgrade cannot permanently lock one.
     const owner=(state.sitter?.activatedBy||"").trim();
     return !owner||sameActor(owner,userName);
   }
@@ -162,6 +169,7 @@
       id:(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2)),
       at:new Date().toISOString(),
       actor:userName||"Unknown device",
+      deviceId:deviceInfo?.id||localDeviceId,
       action:String(action).slice(0,300)
     };
     state.activityLog=[entry,...(Array.isArray(state.activityLog)?state.activityLog:[])].slice(0,MAX_ACTIVITY);
@@ -243,6 +251,32 @@
       return value&&typeof value==="object"?value:{version:0,base:null,updatedAt:null};
     }catch{return{version:0,base:null,updatedAt:null}}
   }
+  function loadDeviceInfo(){
+    try{
+      const value=JSON.parse(localStorage.getItem(DEVICE_KEY)||"null");
+      return value&&typeof value==="object"?value:null;
+    }catch{return null}
+  }
+  function saveDeviceCredential(result){
+    if(!result?.credential||!result?.device?.id)throw new Error("The pairing service returned an incomplete device credential.");
+    connectionCode=result.credential;
+    deviceInfo={id:String(result.device.id),displayName:String(result.device.displayName||userName||"")};
+    localStorage.setItem(CONNECTION_KEY,connectionCode);
+    localStorage.setItem(DEVICE_KEY,JSON.stringify(deviceInfo));
+    // Remove legacy cookies. Device credentials stay in this installed app's
+    // local storage and are never put into a URL or public source file.
+    clearCookie(CONNECTION_COOKIE);
+  }
+  function clearPendingInvite(){
+    pendingInvite="";
+    localStorage.removeItem(INVITE_KEY);
+    clearCookie(INVITE_COOKIE);
+    try{
+      const url=new URL(location.href);
+      url.searchParams.delete("invite");
+      history.replaceState(null,"",url.pathname+url.search+url.hash);
+    }catch{}
+  }
   function saveSyncMeta(){localStorage.setItem(SYNC_KEY,JSON.stringify(syncMeta))}
   function authHeaders(){return{"Authorization":"Bearer "+connectionCode,"Content-Type":"application/json"}}
   function status(message,tone="neutral"){
@@ -272,7 +306,9 @@
   }
 
   async function request(path,options={}){
-    const response=await fetch(ENDPOINT+path,{...options,headers:{...authHeaders(),...(options.headers||{})}});
+    const authenticated=options.auth!==false;
+    const cleanOptions={...options};delete cleanOptions.auth;
+    const response=await fetch(ENDPOINT+path,{...cleanOptions,headers:{...(authenticated?authHeaders():{"Content-Type":"application/json"}),...(options.headers||{})}});
     let body={};
     try{body=await response.json()}catch{}
     if(!response.ok){const error=new Error(body.error||"The shared care service could not be reached.");error.status=response.status;error.body=body;throw error}
@@ -281,6 +317,28 @@
 
   async function fetchRemote(){return request("/v1/care",{method:"GET"})}
   async function saveRemote(data,baseVersion){return request("/v1/care",{method:"PUT",body:JSON.stringify({data,baseVersion})})}
+
+  async function pairDevice(name){
+    const result=await request("/v1/pair",{auth:false,method:"POST",body:JSON.stringify({inviteToken:pendingInvite,displayName:name})});
+    userName=String(result.device?.displayName||name).slice(0,60);
+    localStorage.setItem(USER_KEY,userName);writeCookie(USER_COOKIE,userName);
+    saveDeviceCredential(result);
+    clearPendingInvite();
+    syncMeta={version:0,base:null,updatedAt:null};saveSyncMeta();
+    needsIdentitySetup=false;
+    return result;
+  }
+
+  async function maybeMigrateLegacyCredential(){
+    if(!connectionCode||connectionCode.startsWith("fd_")||deviceInfo?.id)return;
+    try{
+      const result=await request("/v1/devices/migrate",{method:"POST",body:JSON.stringify({displayName:userName||"Family device"})});
+      saveDeviceCredential(result);
+    }catch(error){
+      // A frontend-first rollout must continue to work with the old Worker.
+      if(error.status!==404)console.warn("Legacy device credential migration is not available yet",error);
+    }
+  }
 
   async function pushLocal(local){
     try{return await saveRemote(local,syncMeta.version||0)}
@@ -301,6 +359,7 @@
     syncAgain=false;
     status("Syncing Frannie’s shared record…","working");
     try{
+      await maybeMigrateLegacyCredential();
       const local=currentShared();
       const localChanged=syncMeta.base&&!core.same(local,core.normalize(syncMeta.base));
       let result;
@@ -334,7 +393,20 @@
         if(sitterActiveIntent){
           shared.sitter.activatedAt=state.sitter?.activatedAt||shared.sitter.activatedAt||new Date().toISOString();
           shared.sitter.activatedBy=state.sitter?.activatedBy||shared.sitter.activatedBy||userName||"Unknown device";
+          shared.sitter.activatedByDeviceId=state.sitter?.activatedByDeviceId||shared.sitter.activatedByDeviceId||deviceInfo?.id||localDeviceId;
+          shared.sitter.sessionId=state.sitter?.sessionId||shared.sitter.sessionId||"";
         }
+      }
+      // An intent applied after a GET/merge is still dirty until the server has
+      // acknowledged it. Older code stored the intent-adjusted value as the
+      // sync base before writing it, so the next pass saw no local change and a
+      // stale remote `sitter.active:false` could win forever.
+      const serverState=core.normalize(result.data||{});
+      const sitterNeedsWrite=sitterActiveIntent!==null&&Boolean(serverState.sitter?.active)!==sitterActiveIntent;
+      const focusNeedsWrite=focusSelectionIntent!==null&&!core.same(serverState.selected||[],focusSelectionIntent);
+      if(sitterNeedsWrite||focusNeedsWrite){
+        result=await saveRemote(shared,result.version||0);
+        shared=core.normalize(result.data||shared);
       }
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
@@ -422,11 +494,16 @@
     await synchronize({forcePull:true});
   }
 
-  function disconnect(){
-    if(!confirm("Disconnect this device from Frannie’s shared record? The cached information will stay on this device."))return;
+  async function disconnect(){
+    if(!confirm("Disconnect and revoke this device from Frannie’s shared record? The cached information will stay on this device."))return;
+    if(connectionCode.startsWith("fd_")){
+      try{await request("/v1/devices/current",{method:"DELETE"})}
+      catch(error){alert("This device could not be revoked. Check the connection and try again.");return}
+    }
     connectionCode="";
+    deviceInfo=null;
     syncMeta={version:0,base:null,updatedAt:null};
-    localStorage.removeItem(CONNECTION_KEY);localStorage.removeItem(USER_KEY);clearCookie(CONNECTION_COOKIE);clearCookie(USER_COOKIE);
+    localStorage.removeItem(CONNECTION_KEY);localStorage.removeItem(DEVICE_KEY);localStorage.removeItem(USER_KEY);clearCookie(CONNECTION_COOKIE);clearCookie(USER_COOKIE);
     localStorage.removeItem(SYNC_KEY);
     renderConnectionControls();
     status("Not connected — care stays on this device only","neutral");
@@ -434,10 +511,13 @@
 
   async function shareSetupLink(){
     if(!connectionCode){alert("This device is not connected to Frannie yet.");return}
+    let invite;
+    try{invite=await request("/v1/invites",{method:"POST",body:JSON.stringify({expiresInMinutes:60})})}
+    catch(error){alert("A one-time invite could not be created. Check the shared connection and try again.");return}
     const url=new URL(location.href);
     url.search="";
     url.hash="";
-    url.searchParams.set("connect",connectionCode);
+    url.searchParams.set("invite",invite.inviteToken);
     const text=url.toString();
     if(navigator.share){
       try{
@@ -445,7 +525,7 @@
         return;
       }catch(error){if(error?.name==="AbortError")return}
     }
-    try{await navigator.clipboard.writeText(text);alert("Frannie’s one-time setup link was copied. Send it privately to the family member who needs to connect a device.")}
+    try{await navigator.clipboard.writeText(text);alert("Frannie’s one-time invite was copied. It expires in one hour and stops working after one device pairs.")}
     catch{prompt("Copy this Frannie setup link:",text)}
   }
 
@@ -476,7 +556,12 @@
 
   function saveSitterInstructions(){
     const current=state.sitter||{};
-    state.sitter={...readSitterEditor(),active:Boolean(current.active),activatedAt:current.activatedAt||"",activatedBy:current.activatedBy||""};
+    if(current.active&&!canEndSitter()){
+      alert(`Only ${current.activatedBy||"the person who activated sitter mode"} can edit the active directions. You can still view them.`);
+      fillSitterEditor();
+      return;
+    }
+    state.sitter={...readSitterEditor(),active:Boolean(current.active),activatedAt:current.activatedAt||"",activatedBy:current.activatedBy||"",activatedByDeviceId:current.activatedByDeviceId||"",sessionId:current.sessionId||""};
     if(persist()){
       renderSitterView();renderSitterBanner();
       const saved=document.getElementById("sitterSaved");saved?.classList.remove("hidden");setTimeout(()=>saved?.classList.add("hidden"),2600);
@@ -490,7 +575,7 @@
     }
     const draft=readSitterEditor();
     if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
-    state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device"};
+    state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device",activatedByDeviceId:deviceInfo?.id||localDeviceId,sessionId:(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2))};
     sitterActiveIntent=true;
     sitterDismissedThisForeground=false;
     if(persist()){
@@ -510,7 +595,6 @@
     state.sitter={...state.sitter,active:false};
     sitterActiveIntent=false;
     document.getElementById("sitterEntryAlert")?.classList.remove("open");
-    document.body.style.overflow="";
     if(persist()){
       renderSitterBanner();renderSitterView();
       if(connectionCode)await synchronize();
@@ -531,14 +615,12 @@
     if(state.sitter?.activatedBy)detail=`Directions activated by ${state.sitter.activatedBy}.`;
     if(by)by.textContent=detail;
     alertModal.classList.add("open");
-    document.body.style.overflow="hidden";
   }
 
   function continueToSitterInstructions(){
     sitterDismissedThisForeground=true;
     const alertModal=document.getElementById("sitterEntryAlert");
     alertModal?.classList.remove("open");
-    document.body.style.overflow="";
     try{if(typeof globalThis.showScreen==="function")globalThis.showScreen("care")}catch{}
     openSitter();
   }
@@ -626,8 +708,8 @@
   }
 
   function releaseModalState(){
-    // Keep cleanup simple. Forced transforms caused iOS compositing blackouts.
-    document.body.style.overflow="";
+    // The app shell already owns scrolling. Modals only toggle their open
+    // class, avoiding body-style/compositing churn in iOS WebKit.
   }
   function openSitter(){renderSitterView();document.getElementById("sitterModal")?.classList.add("open")}
   function closeSitter(){document.getElementById("sitterModal")?.classList.remove("open");releaseModalState()}
@@ -665,7 +747,7 @@
     const intro=careCard.querySelector(":scope > p");
     const cloud=document.createElement("div");
     cloud.id="cloudCarePanel";cloud.className="care-cloud-panel";
-    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — care stays on this device only"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Connect to Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share setup link</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
+    cloud.innerHTML=`<div class="care-cloud-main"><div class="care-cloud-heading"><div><h3>Shared Frannie record</h3><p id="cloudCareStatus" data-tone="neutral">${connectionCode?"Connecting to shared care…":"Not connected — open a one-time Frannie invite"}</p></div><span id="cloudCareUserBadge" class="care-user-badge ${userName?"":"hidden"}">${esc(userName||"")}</span></div><div class="care-cloud-actions"><button id="cloudCareConnect" class="primary" type="button">Enter Frannie</button><button id="cloudCareSync" class="secondary hidden" type="button">Reconnect / Sync</button><button id="cloudCareShareSetup" class="secondary hidden" type="button">Share one-time invite</button><button id="cloudCareDisconnect" class="secondary hidden" type="button">Disconnect this device</button></div></div><details id="cloudCareDetails" class="care-connection-details"><summary>Connection & activity</summary><div class="build-stamp">Build ${BUILD_ID}</div><div class="care-cloud-identity"><div id="cloudCareIdentityCompact" class="care-cloud-identity-compact hidden"><span>Using this device as <strong id="cloudCareIdentityName"></strong></span><button id="cloudCareChangeUser" class="secondary compact-button" type="button">Change</button></div><div id="cloudCareIdentityEditor"><label for="cloudCareUserName">Who is using this device?</label><div class="care-cloud-identity-row"><input id="cloudCareUserName" type="text" maxlength="60" autocapitalize="words" placeholder="Mollie, Brett, Michelle, UB…"><button id="cloudCareSaveUser" class="secondary" type="button">Save name</button></div><p id="cloudCareCurrentUser"></p><div id="cloudCareUserSaved" class="save-confirm hidden">✓ Name saved on this device.</div></div></div><details class="care-activity"><summary>Recent shared changes <span class="activity-hint">who changed what + when</span></summary><p id="cloudCareActivityEmpty" class="care-activity-empty">No shared changes have been recorded yet.</p><ol id="cloudCareActivityList"></ol></details></details>`;
     intro?.after(cloud);
 
     const jumpNav=document.createElement("nav");
@@ -724,48 +806,37 @@
 
     const connectModal=document.createElement("div");
     connectModal.className="modal connection-setup-modal";connectModal.id="connectionSetupModal";
-    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">SHARED FRANNIE RECORD</div><h2>Connect this device</h2><p id="setupIntro">Type your name or initials. The family setup link supplies the connection automatically.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" type="text" maxlength="60" autocapitalize="words" autocomplete="off" placeholder="Mollie, UB, Brett…"><button id="showSetupRecovery" class="setup-recovery-link" type="button">Use connection code instead</button><div id="setupRecovery" class="setup-recovery hidden"><label for="setupConnectionCode">Family connection code</label><input id="setupConnectionCode" type="text" maxlength="120" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Family connection code"><small>Recovery only. Normal setup should use the one-time family setup link.</small></div><div class="actions"><button id="setupConnectButton" class="primary" type="button">Connect to Frannie</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
+    connectModal.innerHTML=`<div class="connection-setup-card"><div class="connection-setup-kicker">FRANNIE’S FAMILY</div><h2>Enter Frannie</h2><p id="setupIntro">Add the name or initials family members will see with your changes.</p><label for="setupUserName">Name or initials</label><input id="setupUserName" type="text" maxlength="60" autocapitalize="words" autocomplete="name" placeholder="Mollie, UB, Brett…"><div class="actions"><button id="setupConnectButton" class="primary" type="button">Enter Frannie</button><button id="setupCancelButton" class="secondary" type="button">Not now</button></div></div>`;
     document.body.appendChild(connectModal);
 
     const openConnectionSetup=()=>{
       const name=document.getElementById("setupUserName");
       const intro=document.getElementById("setupIntro");
-      const recovery=document.getElementById("setupRecovery");
-      const manualCode=document.getElementById("setupConnectionCode");
       if(name)name.value=userName||"";
-      if(manualCode)manualCode.value="";
-      if(intro)intro.textContent=connectionCode?"Type your name or initials. This device already has Frannie’s family connection.":"Type your name or initials. If you opened the family setup link, that is all you need.";
-      if(recovery)recovery.classList.add("hidden");
-      const recoveryButton=document.getElementById("showSetupRecovery");
-      if(recoveryButton)recoveryButton.classList.toggle("hidden",Boolean(connectionCode));
+      if(intro)intro.textContent=pendingInvite?"Add the name or initials family members will see with your changes.":connectionCode?"Add the name or initials for this connected device.":"Open a current one-time Frannie invite on this device first.";
       connectModal.classList.add("open");
-      document.body.style.overflow="hidden";
       setTimeout(()=>name?.focus(),50);
     };
     const closeConnectionSetup=()=>{connectModal.classList.remove("open");releaseModalState()};
     const connectFromSetup=async()=>{
       const name=(document.getElementById("setupUserName")?.value||"").trim();
-      const manualCode=(document.getElementById("setupConnectionCode")?.value||"").trim();
-      const code=(connectionCode||manualCode).trim();
       if(!name){alert("Add the name or initials for this device.");return}
-      if(!code){alert("Open the family setup link or enter the family connection code.");return}
-      userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);
-      renderIdentityControls();
-      closeConnectionSetup();
-      await connect(code);
+      try{
+        if(pendingInvite){await pairDevice(name)}
+        else if(connectionCode){userName=name.slice(0,60);localStorage.setItem(USER_KEY,userName);await connect(connectionCode)}
+        else{alert("Open a current one-time Frannie invite on this device first.");return}
+        renderConnectionControls();renderIdentityControls();closeConnectionSetup();await synchronize({forcePull:true});
+      }catch(error){
+        const message=error.status===410?"This invite has expired or was already used. Ask a connected family member for a new one.":error.status===404?"This invite is not valid. Ask for a new Frannie invite.":"Frannie could not pair this device. Check the connection and try again.";
+        alert(message);
+      }
     };
 
     document.getElementById("cloudCareConnect").addEventListener("click",openConnectionSetup);
     document.getElementById("setupConnectButton").addEventListener("click",connectFromSetup);
     document.getElementById("setupCancelButton").addEventListener("click",closeConnectionSetup);
-    document.getElementById("showSetupRecovery").addEventListener("click",()=>{
-      document.getElementById("setupRecovery")?.classList.remove("hidden");
-      document.getElementById("showSetupRecovery")?.classList.add("hidden");
-      setTimeout(()=>document.getElementById("setupConnectionCode")?.focus(),30);
-    });
     connectModal.addEventListener("click",event=>{if(event.target===connectModal)closeConnectionSetup()});
     document.getElementById("setupUserName").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
-    document.getElementById("setupConnectionCode").addEventListener("keydown",event=>{if(event.key==="Enter")connectFromSetup()});
     document.getElementById("cloudCareSaveUser").addEventListener("click",saveUserName);
     document.getElementById("cloudCareChangeUser").addEventListener("click",editUserName);
     document.getElementById("cloudCareUserName").addEventListener("keydown",event=>{if(event.key==="Enter")saveUserName()});
@@ -802,7 +873,7 @@
     }else if(connectionCode&&userName){
       setTimeout(()=>refreshForAppEntry(),0);
     }else if(!connectionCode){
-      status("Not connected — use the family setup link or Connect to Frannie","neutral");
+      status(pendingInvite?"One-time invite ready — enter your name to pair":"Not connected — open a one-time Frannie invite","neutral");
     }
   }
 

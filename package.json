@@ -1,0 +1,8 @@
+{
+  "name": "frannie-codex-tester",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/regression.mjs && node tests/worker-regression.mjs"
+  }
+}
