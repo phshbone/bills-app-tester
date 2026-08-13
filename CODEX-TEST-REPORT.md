@@ -3,8 +3,8 @@
 ## PROVEN
 
 - JavaScript syntax passes for `app.js`, `shared-care-core.js`, `shared-care.js`, `sw.js`, and `worker/src/worker.js`.
-- 23 executable state/structure assertions pass: sitter merge persistence, owner/session fields, multiple current medications/foods, append-only audit union, all-current sitter filters, session-only checklist, secure invite URLs, compact connection controls, explicit medication status, separated treatment actions, iPhone modal cleanup, and PWA asset/cache alignment.
-- 16 simulated Worker assertions pass: live health compatibility, valid invite, device credential issuance, used invite rejection, invalid invite rejection, complete shared-state persistence, stale-version conflict, revocation, rejected revoked credential, and administrative recovery invite.
+- 27 executable state/structure assertions pass: sitter merge persistence, owner/session fields, multiple current medications/foods, append-only audit union, all-current sitter filters, session-only checklist, secure invite and recovery URLs, compact connection controls, explicit medication status, separated treatment actions, iPhone modal cleanup, and PWA asset/cache alignment.
+- 24 simulated Worker assertions pass: live health compatibility, valid invite, reusable and replaceable recovery links, same-name device retirement, sitter ownership handoff, complete shared-state persistence, stale-version conflict, revocation, and administrative recovery.
 - No permanent family or device credential is included in source, HTML, or the invite URL implementation.
 
 Command: `npm test`
@@ -20,7 +20,7 @@ Command: `npm test`
 
 - `setNextActivity -> onLocalPersist -> addActivity -> Store.save -> extract -> merge -> applyShared -> renderActivityLog` remains connected.
 - Active sitter editing and ending require the owner device; viewing does not.
-- Cache `v36` and query versions (`app/styles 32`, shared scripts 16) agree.
+- Cache `v37` and query versions (`app/styles 33`, shared scripts 17) agree.
 - Old caches are deleted; core files use network-first with cached fallback.
 - Pairing tokens are temporary; device credentials stay in local storage and D1 stores only hashes.
 - No Cloudflare deployment, live D1 mutation, Worker setting change, or secret creation was performed.

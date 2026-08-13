@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "frannie-care",
+  "main": "src/worker.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-08-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://phshbone.github.io,http://127.0.0.1:8788,http://localhost:8788"
+  },
+  "d1_databases": [
+    {
+      "binding": "CARE_DB",
+      "database_name": "frannie-care",
+      "database_id": "a8aa46e3-28c0-443b-8b63-acd2f8ecb77f",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

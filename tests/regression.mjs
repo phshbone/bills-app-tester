@@ -35,6 +35,8 @@ assert.doesNotMatch(shared,/searchParams\.set\("(?:connect|invite)",connectionCo
 assert.doesNotMatch(shared,/document\.body\.style\.overflow/,"sitter/connection modals do not mutate body overflow");
 assert.match(shared,/Manage connection & activity[\s\S]*care-cloud-actions/,"connection controls live inside the collapsible details panel");
 assert.match(shared,/closeConnectionSetup\(\);setTimeout\(\(\)=>alert/,"connection errors release the dimming modal before showing an alert");
+assert.match(shared,/Create \/ replace recovery link/,"connected devices expose a reusable recovery-link control");
+assert.match(shared,/request\("\/v1\/recovery-links"/,"recovery links are created by the authenticated Worker endpoint");
 
 const html=fs.readFileSync(new URL("index.html",root),"utf8");
 const sw=fs.readFileSync(new URL("sw.js",root),"utf8");
@@ -42,15 +44,17 @@ const app=fs.readFileSync(new URL("app.js",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=32","app.js?v=32","shared-care-core.js?v=16","shared-care.js?v=16"]){
+for(const asset of ["styles.css?v=33","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=17"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v36/,"service worker cache version is v36");
+assert.match(sw,/frannies-good-girl-v37/,"service worker cache version is v37");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
 assert.doesNotMatch(worker,/LEGACY_FAMILY_TOKEN\s*=\s*["']/,"legacy credential is not embedded");
 assert.match(worker,/credential_hash/,"device credentials are stored by hash");
 assert.match(worker,/used_at IS NULL AND expires_at > CURRENT_TIMESTAMP/,"invite claim is single-use and expiry checked");
 assert.match(worker,/revoked_at/,"revoked credentials are rejected");
+assert.match(worker,/frannie_recovery_links/,"recovery links are hashed, server-held, and revocable");
+assert.match(worker,/activatedByDeviceId/,"recovery pairing transfers matching active sitter ownership");
 
-console.log("PASS: 23 Frannie state, sync, pairing, audit, checklist, care UI, and PWA regression assertions");
+console.log("PASS: 27 Frannie state, sync, pairing, recovery, audit, checklist, care UI, and PWA regression assertions");
