@@ -19,7 +19,9 @@ jobs:
         with:
           node-version: 20
       - name: Apply restored sitter UI
-        run: python .github/restore-sitter-ui.py
+        run: |
+          python .github/restore-sitter-ui.py
+          python .github/fix-style-eof.py
       - name: Syntax and regression
         run: |
           node --check sitter-mode.js
