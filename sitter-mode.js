@@ -41,8 +41,7 @@
 
   function create(options){
     const checklistChecks=new Set();
-    let returnScreen="care";
-    let foregroundOpened=false;
+    let entryDismissedThisForeground=false;
 
     function getSitter(){return normalize(options.getSitter())}
     function getUser(){return text(options.getUser()).trim()}
@@ -76,19 +75,28 @@
       if(saved){
         renderAll();
         options.syncSoon?.();
-        if(open)openView("care");
+        if(open)showEntryAlert(true);
       }
       return saved;
     }
 
-    function resetPreReleaseSession(){
-      const current=getSitter();
-      if(!current.active)return false;
-      const activatedAt=Date.parse(current.activatedAt||"")||0;
-      if(activatedAt>=PRE_RELEASE_RESET_CUTOFF)return false;
-      const actor=getUser()||"System";
-      const next={...current,active:false,endedAt:new Date().toISOString(),endedBy:actor};
-      return setAndPersist(next,"Reset pre-release sitter test session");
+    function isPreReleaseSession(value){
+      const sitter=normalize(value);
+      if(!sitter.active)return false;
+      const activatedAt=Date.parse(sitter.activatedAt||"")||0;
+      return activatedAt<PRE_RELEASE_RESET_CUTOFF;
+    }
+
+    function buildMigrationEnd(value){
+      const current=normalize(value);
+      const existing=loadPending();
+      if(existing&&!existing.sitter.active&&existing.sitter.sessionId===current.sessionId)return existing.sitter;
+      const actor=getUser()||current.activatedBy||"System";
+      const next=stamp({...current,active:false,endedAt:new Date().toISOString(),endedBy:actor});
+      storePending(next);
+      options.setSitter(next);
+      options.saveLocalOnly?.();
+      return next;
     }
 
     function restorePendingIntoLocal(){
@@ -106,8 +114,17 @@
     }
 
     function resolveRemote(remoteValue){
-      const pending=loadPending();
-      const decision=resolveMutation(remoteValue,pending);
+      const remote=normalize(remoteValue);
+      let pending=loadPending();
+      // Migration rule: an old test-era active session must be ended in the
+      // shared record itself. Keep returning an authoritative inactive
+      // mutation until the Worker acknowledges that exact changeId.
+      if(isPreReleaseSession(remote)){
+        const reset=buildMigrationEnd(remote);
+        pending=loadPending();
+        return {sitter:reset,mustWrite:true,acknowledged:false};
+      }
+      const decision=resolveMutation(remote,pending);
       if(decision.clearPending)clearPending();
       return {sitter:decision.sitter,mustWrite:decision.mustWrite,acknowledged:decision.acknowledged};
     }
@@ -154,7 +171,7 @@
         endedAt:"",
         endedBy:""
       };
-      foregroundOpened=true;
+      entryDismissedThisForeground=false;
       setAndPersist(next,"Activated Sitter Mode",{open:true});
     }
 
@@ -168,9 +185,10 @@
       if(!confirm("End Sitter Mode? The instructions will remain saved as a draft."))return;
       const actor=getUser()||current.activatedBy||"Unknown user";
       const next={...current,active:false,endedAt:new Date().toISOString(),endedBy:actor};
-      foregroundOpened=true;
+      entryDismissedThisForeground=false;
       if(setAndPersist(next,"Ended Sitter Mode")){
-        if(document.getElementById("sitterViewScreen")?.classList.contains("active"))closeView();
+        closeView();
+        closeEntryAlert();
       }
     }
 
@@ -194,59 +212,60 @@
       }).join("");
     }
 
-    function buildScreen(){
-      if(document.getElementById("sitterViewScreen"))return;
-      const main=document.querySelector(".app main");
-      if(!main)return;
-      const screen=document.createElement("section");
-      screen.id="sitterViewScreen";
-      screen.className="screen sitter-page-screen";
-      screen.innerHTML=`
-        <div class="card sitter-page-card">
-          <div class="sitter-page-head">
-            <div><div class="eyebrow">Live caretaker reference</div><h2>Frannie’s Sitter</h2><p id="sitterPageMeta"></p></div>
-            <button id="closeSitterPage" class="secondary" type="button">Close</button>
-          </div>
-          <div id="sitterPageNotice" class="sitter-page-notice"></div>
-          <label class="sitter-checklist"><input id="sitterChecklistToggle" type="checkbox"> Add a temporary caretaker checklist</label>
-          <div id="sitterViewContent"></div>
-          <div class="actions sitter-page-actions">
-            <button class="secondary" id="editSitterPage" type="button">Edit instructions</button>
-            <button class="secondary" id="endSitterPage" type="button">End Sitter Mode</button>
-            <button class="primary" id="shareSitterView" type="button">Share</button>
-            <button class="secondary" id="printSitterView" type="button">Print / PDF</button>
-          </div>
-        </div>`;
-      main.appendChild(screen);
-      document.getElementById("closeSitterPage")?.addEventListener("click",closeView);
-      document.getElementById("editSitterPage")?.addEventListener("click",()=>{
-        closeView("care");
-        setTimeout(()=>document.getElementById("sitterEditor")?.scrollIntoView({behavior:"smooth",block:"start"}),80);
-      });
-      document.getElementById("endSitterPage")?.addEventListener("click",end);
-      document.getElementById("sitterChecklistToggle")?.addEventListener("change",renderView);
-      document.getElementById("sitterViewContent")?.addEventListener("change",event=>{
-        const checkbox=event.target.closest("input[data-sitter-check]");
-        if(!checkbox)return;
-        const key=checkbox.dataset.sitterCheck||"";
-        if(!key)return;
-        if(checkbox.checked)checklistChecks.add(key);else checklistChecks.delete(key);
-      });
-      document.getElementById("shareSitterView")?.addEventListener("click",share);
-      document.getElementById("printSitterView")?.addEventListener("click",print);
+    function buildOverlays(){
+      if(!document.getElementById("sitterModal")){
+        const modal=document.createElement("div");
+        modal.className="modal sitter-modal";modal.id="sitterModal";
+        modal.innerHTML=`<div class="modal-box sitter-modal-box"><div class="modal-head"><strong>Frannie’s Sitter</strong><button id="closeSitterView" type="button">Close ✕</button></div><div class="sitter-modal-body"><label class="sitter-checklist"><input id="sitterChecklistToggle" type="checkbox"> Add a temporary caretaker checklist</label><div id="sitterViewContent"></div><div class="actions"><button class="primary" id="shareSitterView" type="button">Share</button><button class="secondary" id="printSitterView" type="button">Print / PDF</button></div></div></div>`;
+        document.body.appendChild(modal);
+        document.getElementById("closeSitterView")?.addEventListener("click",closeView);
+        document.getElementById("sitterChecklistToggle")?.addEventListener("change",renderView);
+        document.getElementById("sitterViewContent")?.addEventListener("change",event=>{
+          const checkbox=event.target.closest("input[data-sitter-check]");
+          if(!checkbox)return;
+          const key=checkbox.dataset.sitterCheck||"";
+          if(!key)return;
+          if(checkbox.checked)checklistChecks.add(key);else checklistChecks.delete(key);
+        });
+        document.getElementById("shareSitterView")?.addEventListener("click",share);
+        document.getElementById("printSitterView")?.addEventListener("click",print);
+        modal.addEventListener("click",event=>{if(event.target===modal)closeView()});
+      }
+      if(!document.getElementById("sitterEntryAlert")){
+        const alertModal=document.createElement("div");
+        alertModal.className="modal sitter-entry-alert";alertModal.id="sitterEntryAlert";
+        alertModal.setAttribute("role","dialog");alertModal.setAttribute("aria-modal","true");alertModal.setAttribute("aria-labelledby","sitterEntryAlertTitle");
+        alertModal.innerHTML=`<div class="sitter-entry-card"><div class="sitter-entry-paws" aria-hidden="true">🐾 &nbsp; 🐾</div><div class="sitter-entry-kicker">CARETAKER ALERT</div><h2 id="sitterEntryAlertTitle">Puppy Sitting Mode</h2><p id="sitterEntryAlertMeta">Active sitter directions are waiting for you.</p><p class="sitter-entry-copy">Please review Frannie’s current food, medication, routine, cautions, and sitter-specific instructions before continuing.</p><button id="continueToSitterInstructions" class="primary" type="button">View sitter instructions</button><button id="dismissSitterEntry" class="secondary sitter-entry-dismiss" type="button">Close</button></div>`;
+        document.body.appendChild(alertModal);
+        document.getElementById("continueToSitterInstructions")?.addEventListener("click",()=>{closeEntryAlert();openView()});
+        document.getElementById("dismissSitterEntry")?.addEventListener("click",closeEntryAlert);
+      }
     }
 
-    function openView(fromScreen){
-      buildScreen();
-      const active=document.querySelector(".screen.active");
-      if(fromScreen)returnScreen=fromScreen;
-      else if(active?.id&&active.id!=="sitterViewScreen")returnScreen=active.id;
-      renderAll();
-      options.showScreen("sitterViewScreen");
-      foregroundOpened=true;
+    function openView(){
+      buildOverlays();
+      renderView();
+      document.getElementById("sitterEntryAlert")?.classList.remove("open");
+      entryDismissedThisForeground=true;
+      document.getElementById("sitterModal")?.classList.add("open");
     }
-    function closeView(target){
-      options.showScreen(target||returnScreen||"care");
+    function closeView(){
+      document.getElementById("sitterModal")?.classList.remove("open");
+      document.activeElement?.blur?.();
+    }
+    function closeEntryAlert(){
+      document.getElementById("sitterEntryAlert")?.classList.remove("open");
+      entryDismissedThisForeground=true;
+      document.activeElement?.blur?.();
+    }
+    function showEntryAlert(force=false){
+      const sitter=getSitter();
+      if(!sitter.active||!options.splashDismissed())return;
+      if(entryDismissedThisForeground&&!force)return;
+      buildOverlays();
+      const meta=document.getElementById("sitterEntryAlertMeta");
+      if(meta)meta.textContent=sitter.activatedBy?`Directions activated by ${sitter.activatedBy}.`:"Active sitter directions are waiting for you.";
+      document.getElementById("sitterEntryAlert")?.classList.add("open");
     }
 
     function renderView(){
@@ -254,28 +273,6 @@
       if(!content)return;
       const checklist=document.getElementById("sitterChecklistToggle")?.checked||false;
       content.innerHTML=html({checklist});
-      const sitter=getSitter();
-      const meta=document.getElementById("sitterPageMeta");
-      const notice=document.getElementById("sitterPageNotice");
-      const edit=document.getElementById("editSitterPage");
-      const endButton=document.getElementById("endSitterPage");
-      const owner=isOwner(sitter);
-      if(meta){
-        let label=sitter.active?`Sitter Mode active${sitter.activatedBy?` · activated by ${sitter.activatedBy}`:""}`:"Sitter Mode is not active";
-        if(sitter.active&&sitter.activatedAt){try{label+=` · ${new Date(sitter.activatedAt).toLocaleString()}`}catch{}}
-        meta.textContent=label;
-      }
-      if(notice){
-        notice.textContent=sitter.active
-          ?(owner?"This live sitter sheet stays active until you end it.":`This live sitter sheet is owned by ${sitter.activatedBy||"the activator"}. You can view it, but only that person can edit or end it.`)
-          :"These are the saved sitter instructions. Sitter Mode is currently off.";
-      }
-      if(edit){edit.disabled=sitter.active&&!owner;edit.textContent=sitter.active&&!owner?`Only ${sitter.activatedBy||"activator"} can edit`:"Edit instructions"}
-      if(endButton){
-        endButton.classList.toggle("hidden",!sitter.active);
-        endButton.disabled=sitter.active&&!owner;
-        endButton.textContent=sitter.active&&!owner?`Only ${sitter.activatedBy||"activator"} can end`:"End Sitter Mode";
-      }
     }
 
     function renderBanner(){
@@ -330,17 +327,16 @@
       window.addEventListener("afterprint",cleanup);void report.offsetHeight;window.print();
     }
 
-    function onForeground(){
-      const sitter=getSitter();
-      if(!sitter.active||foregroundOpened||!options.splashDismissed())return;
-      openView(document.querySelector(".screen.active")?.id||"home");
+    function onForeground(){showEntryAlert(false)}
+    function onHidden(){
+      entryDismissedThisForeground=false;
+      document.getElementById("sitterModal")?.classList.remove("open");
+      document.getElementById("sitterEntryAlert")?.classList.remove("open");
     }
-    function onHidden(){foregroundOpened=false}
-    function afterSplashDismiss(){foregroundOpened=false;setTimeout(onForeground,120)}
+    function afterSplashDismiss(){entryDismissedThisForeground=false;setTimeout(onForeground,120)}
 
-    buildScreen();
+    buildOverlays();
     restorePendingIntoLocal();
-    resetPreReleaseSession();
 
     return {
       normalize,
