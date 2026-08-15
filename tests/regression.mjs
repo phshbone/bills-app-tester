@@ -84,11 +84,11 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons retain a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=38","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=3","shared-care.js?v=20"]){
+for(const asset of ["styles.css?v=39","app.js?v=35","shared-care-core.js?v=18","sitter-mode.js?v=3","shared-care.js?v=20"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
 assert.match(sw,/frannie-pr7-stable-/,"service worker cache remains isolated to this app");
-assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v5`/,"restored sitter UI advances the isolated cache generation");
+assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v6`/,"restored sitter UI advances the isolated cache generation");
 assert.match(sw,/keys\.filter\(k=>k\.startsWith\(CACHE_PREFIX\)&&k!==CACHE_NAME\)/,"cache cleanup cannot delete another app's caches");
 assert.match(sw,/sitter-mode\.js/,"service worker treats the sitter module as an app-shell/core asset");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the toolbar uses the toolbar color");
@@ -130,3 +130,6 @@ assert.match(sitterSource,/function isPreReleaseSession\(value\)/,"legacy test s
 assert.match(sitterSource,/if\(isPreReleaseSession\(remote\)\)[\s\S]*mustWrite:true/,"an old cloud-active session is force-ended through the shared sync write path");
 assert.match(sitterSource,/activatedAt<PRE_RELEASE_RESET_CUTOFF/,"post-cutoff sitter sessions are never auto-ended");
 console.log("PASS: Frannie restored sitter overlays + persistent ownership + structural app-shell regression assertions");
+assert.match(app,/classList\.toggle\("header-compact",id!=="home"\)/,"header mode follows screen selection only");
+assert.match(css,/\.hero\.header-compact p\{display:none\}/,"non-Home screens hide only hero description");
+assert.doesNotMatch(app,/hero.*scroll|scroll.*hero/i,"header behavior does not depend on scrolling");

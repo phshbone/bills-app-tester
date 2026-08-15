@@ -476,3 +476,6 @@ html.install-required .install-curtain{
 .sitter-entry-card #continueToSitterInstructions{background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
 .sitter-entry-dismiss{background:#fff8f5!important;color:#704753!important}
 @media(max-width:420px){.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}
+
+/* Static per-screen hero: Home full, all other screens compact */
+.hero.header-compact p{display:none}
