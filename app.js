@@ -180,7 +180,7 @@ if(sessionStorage.getItem("frannieSplashSeen")==="1"){
   const splash=$("splashScreen");
   if(splash){splash.classList.add("hide");splash.setAttribute("aria-hidden","true")}
 }else{
-  splashTimer=setTimeout(dismissSplash,3000);
+  splashTimer=setTimeout(dismissSplash,5000);
 }
 
 function treatmentStatus(x){if(x.type==="Medication")return x.active===true?["Ongoing","status-ongoing"]:["Ended","status-ended"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
