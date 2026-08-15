@@ -1,0 +1,38 @@
+name: BTR Sitter Jump
+on:
+  push:
+    branches: [btr-sitter-jump-20260815]
+permissions:
+  contents: write
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: btr-sitter-jump-20260815
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply sitter jump
+        run: python .github/sitter-jump.py
+      - name: Syntax and regression
+        run: |
+          node --check shared-care.js
+          npm test
+      - name: Verify scope
+        run: |
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' index.html shared-care.js sw.js tests/regression.mjs | sort)"
+          printf 'Changed files:\n%s\n' "$changed"
+          test "$changed" = "$expected"
+          git diff -- sitter-mode.js app.js styles.css shared-care-core.js worker/src/worker.js
+      - name: Commit isolated sitter jump
+        run: |
+          git config user.name "BTR Sitter Jump"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html shared-care.js sw.js tests/regression.mjs
+          git commit -m "Aim Sitter pill at controls"
+          git push origin HEAD:btr-sitter-jump-20260815
