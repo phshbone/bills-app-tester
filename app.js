@@ -45,7 +45,7 @@ function normalizeTreatments(items){
 }
 
 function defaultState(){
-  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:"",activatedByDeviceId:"",sessionId:""}};
+  return {version:STORAGE_VERSION,profile:null,selected:[],completed:[],logs:[],treatments:[],treatmentHistory:[],careHistory:[],allergies:[],weights:[],heights:[],careNotes:[],feeding:null,feedingItems:[],feedingHistory:[],activityLog:[],sitter:{pottyRoutine:"",crateSleep:"",emergencyVet:"",instructions:"",active:false,activatedAt:"",activatedBy:"",activatedByDeviceId:"",sessionId:"",changedAt:"",changedBy:"",changeId:"",endedAt:"",endedBy:""}};
 }
 function normalizeState(raw){
   const base=defaultState();

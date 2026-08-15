@@ -4,8 +4,8 @@ import vm from "node:vm";
 
 const root=new URL("../",import.meta.url);
 const coreSource=fs.readFileSync(new URL("shared-care-core.js",root),"utf8");
-const context={globalThis:{}};vm.createContext(context);vm.runInContext(coreSource,context);
-const core=context.globalThis.FrannieCareCore;
+const coreContext={globalThis:{}};vm.createContext(coreContext);vm.runInContext(coreSource,coreContext);
+const core=coreContext.globalThis.FrannieCareCore;
 
 const base=core.normalize({
   sitter:{active:false},
@@ -13,10 +13,11 @@ const base=core.normalize({
   feedingItems:[{id:"f1",category:"Treat",brand:"One",active:true},{id:"f2",category:"Treat",brand:"Two",active:true}],
   activityLog:[{id:"old",at:"2026-08-12T10:00:00Z",actor:"A",action:"Old"}]
 });
-const activated=core.normalize({...base,sitter:{active:true,activatedBy:"Mollie",activatedByDeviceId:"device-a",sessionId:"session-a"}});
+const activated=core.normalize({...base,sitter:{active:true,activatedBy:"Mollie",sessionId:"session-a",changedAt:"2026-08-15T13:00:00Z",changedBy:"Mollie",changeId:"change-a"}});
 const merged=core.merge(base,activated,base);
 assert.equal(merged.sitter.active,true,"local sitter activation survives a stale remote value");
-assert.equal(merged.sitter.activatedByDeviceId,"device-a","device ownership survives normalization and merge");
+assert.equal(merged.sitter.activatedBy,"Mollie","sitter ownership is attributed to the person");
+assert.equal(merged.sitter.changeId,"change-a","sitter mutation identity survives normalization and merge");
 assert.equal(merged.treatments.filter(x=>x.active).length,2,"multiple current medications coexist");
 assert.equal(merged.feedingItems.filter(x=>x.active).length,2,"multiple same-category current foods coexist");
 
@@ -25,36 +26,78 @@ const audit=core.merge(base,activated,remote).activityLog;
 assert.deepEqual(Array.from(audit,x=>x.id),["new","old"],"audit merge is append-only and newest-first");
 assert.equal(core.mergeActivityLog([...audit,audit[0]],audit).length,2,"audit IDs remain exactly once");
 
+const sitterSource=fs.readFileSync(new URL("sitter-mode.js",root),"utf8");
+const sitterContext={globalThis:{}};vm.createContext(sitterContext);vm.runInContext(sitterSource,sitterContext);
+const sitterLogic=sitterContext.globalThis.FrannieSitterMode.logic;
+assert.equal(sitterLogic.ownerMatches({active:true,activatedBy:"Mollie"},"mollie"),true,"the activating person owns the active sitter session regardless of name case");
+assert.equal(sitterLogic.ownerMatches({active:true,activatedBy:"Mollie"},"Brett"),false,"a different family member cannot end the owner's sitter session");
+assert.equal(sitterLogic.ownerMatches({active:false,activatedBy:"Mollie"},"Mollie"),false,"an inactive sitter draft has no active-session owner");
+
+const pendingActivate={changeId:"activate-1",sitter:{active:true,activatedBy:"Mollie",sessionId:"session-1",changedAt:"2026-08-15T13:10:00Z",changeId:"activate-1"}};
+const staleInactive={active:false,activatedBy:"Mollie",sessionId:"session-1",changedAt:"2026-08-15T13:09:00Z",changeId:"older-0"};
+let decision=sitterLogic.resolveMutation(staleInactive,pendingActivate);
+assert.equal(decision.mustWrite,true,"pending activation remains authoritative over an older inactive cloud state");
+assert.equal(decision.sitter.active,true,"stale cloud data cannot silently deactivate a pending activation");
+
+const pendingEnd={changeId:"end-1",sitter:{active:false,activatedBy:"Mollie",sessionId:"session-1",changedAt:"2026-08-15T13:20:00Z",changeId:"end-1",endedBy:"Mollie"}};
+const staleActive={active:true,activatedBy:"Mollie",sessionId:"session-1",changedAt:"2026-08-15T13:19:00Z",changeId:"older-1"};
+decision=sitterLogic.resolveMutation(staleActive,pendingEnd);
+assert.equal(decision.mustWrite,true,"pending end remains authoritative over an older active cloud state");
+assert.equal(decision.sitter.active,false,"stale cloud data cannot reactivate a session the owner ended");
+
+decision=sitterLogic.resolveMutation({...pendingEnd.sitter},pendingEnd);
+assert.equal(decision.acknowledged,true,"matching mutation id is an exact server acknowledgement");
+assert.equal(decision.clearPending,true,"acknowledged sitter command may clear its durable pending envelope");
+
+decision=sitterLogic.resolveMutation({active:true,activatedBy:"Mollie",sessionId:"session-2",changedAt:"2026-08-15T13:30:00Z",changeId:"newer-2"},pendingEnd);
+assert.equal(decision.mustWrite,false,"a genuinely newer remote sitter mutation supersedes an obsolete pending envelope");
+assert.equal(decision.clearPending,true,"obsolete pending state is discarded instead of resurrecting an older session");
+
 const shared=fs.readFileSync(new URL("shared-care.js",root),"utf8");
-assert.match(shared,/sitterNeedsWrite[\s\S]*saveRemote\(shared,result\.version\|\|0\)/,"unacknowledged sitter intent is pushed before becoming the sync base");
-assert.match(shared,/SITTER_INTENT_KEY="frannieCareSitterIntentV1"/,"pending sitter intent has durable local storage");
-assert.match(shared,/let sitterActiveIntent=loadSitterIntent\(\)/,"pending sitter intent is restored after a PWA restart");
-assert.match(shared,/setSitterIntent\(false\)/,"ending sitter mode records a durable false intent");
-assert.match(shared,/clearSitterIntent\(\)[\s\S]*sitterAcknowledged/,"pending sitter intent is cleared only after matching server acknowledgement");
-assert.match(shared,/thisDeviceIds\.includes\(ownerDevice\)\|\|sameNamedOwner/,"the same named owner can reclaim a sitter session after device-id rotation");
-assert.match(shared,/activatedByDeviceId:deviceInfo\?\.id\|\|localDeviceId/,"activation binds ownership to the device");
-assert.match(shared,/currentMedication=.*filter\(item=>item\.type==="Medication"&&item\.active===true\)/,"sitter filters every explicit current medication");
-assert.match(shared,/currentFood=.*filter\(item=>item\.active===true\)/,"sitter filters every explicit current feeding item");
-assert.match(shared,/sitterChecklistChecks=new Set\(\)/,"checklist state is session-only");
+assert.match(shared,/sitterMode\.resolveRemote\(serverState\.sitter\)/,"shared-care sync delegates sitter reconciliation to the new module");
+assert.doesNotMatch(shared,/sitterActiveIntent|sitterDismissedThisForeground|canEndSitter/,"old sitter patch machinery is removed");
+assert.doesNotMatch(shared,/sitterModal|sitterEntryAlert|continueToSitterInstructions/,"old fixed sitter modal and entry overlay are removed");
+assert.match(shared,/currentMedication=.*filter\(item=>item\.type==="Medication"&&item\.active===true\)/,"sitter includes every explicit current medication");
+assert.match(shared,/currentFood=.*filter\(item=>item\.active===true\)/,"sitter includes every explicit current feeding item");
 assert.doesNotMatch(shared,/searchParams\.set\("(?:connect|invite)",connectionCode\)/,"permanent credentials are never put in invite URLs");
-assert.doesNotMatch(shared,/document\.body\.style\.overflow/,"sitter/connection modals do not mutate body overflow");
-assert.match(shared,/Manage connection & activity[\s\S]*care-cloud-actions/,"connection controls live inside the collapsible details panel");
-assert.match(shared,/closeConnectionSetup\(\);setTimeout\(\(\)=>alert/,"connection errors release the dimming modal before showing an alert");
-assert.match(shared,/Create \/ replace recovery link/,"connected devices expose a reusable recovery-link control");
-assert.match(shared,/request\("\/v1\/recovery-links"/,"recovery links are created by the authenticated Worker endpoint");
+assert.doesNotMatch(shared,/document\.body\.style\.overflow/,"shared care never mutates body overflow");
+assert.match(shared,/Manage connection & activity[\s\S]*care-cloud-actions/,"connection controls remain inside the collapsible details panel");
+assert.match(shared,/closeConnectionSetup\(\);setTimeout\(\(\)=>alert/,"connection errors release their modal before showing an alert");
+assert.match(shared,/Create \/ replace recovery link/,"connected devices retain reusable recovery-link control");
+assert.match(shared,/request\("\/v1\/recovery-links"/,"recovery links remain created by the authenticated Worker endpoint");
+
+assert.match(sitterSource,/PENDING_KEY="frannieSitterPendingV2"/,"sitter commands persist independently across PWA suspension/restart");
+assert.match(sitterSource,/Activated Sitter Mode/,"activation is explicitly attributed in the activity log");
+assert.match(sitterSource,/Ended Sitter Mode/,"deactivation is explicitly attributed in the activity log");
+assert.match(sitterSource,/Updated active sitter instructions/,"the active-session owner can update the live sitter sheet");
+assert.match(sitterSource,/screen\.id="sitterViewScreen"[\s\S]*screen\.className="screen sitter-page-screen"/,"caretaker view is a normal app screen rather than a modal overlay");
+assert.doesNotMatch(sitterSource,/className="modal|classList\.add\("open"\)|document\.body\.style\.overflow/,"rewritten sitter UI has no fixed modal/backdrop state");
+assert.match(sitterSource,/Only \$\{current\.activatedBy[\s\S]*can edit the active instructions/,"non-owner cannot edit an active sitter session");
+assert.match(sitterSource,/Only \$\{current\.activatedBy[\s\S]*can end this sitter session/,"non-owner cannot end an active sitter session");
 
 const html=fs.readFileSync(new URL("index.html",root),"utf8");
 const sw=fs.readFileSync(new URL("sw.js",root),"utf8");
 const app=fs.readFileSync(new URL("app.js",root),"utf8");
 const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
-assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
+assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons retain a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=34","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=20"]){
+for(const asset of ["styles.css?v=36","app.js?v=33","shared-care-core.js?v=18","sitter-mode.js?v=1","shared-care.js?v=19"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v40/,"service worker cache version is v38");
-assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the fixed toolbar uses the toolbar color");
+assert.match(sw,/frannie-pr7-stable-/,"service worker cache remains isolated to this app");
+assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v2`/,"sitter rewrite advances the isolated cache generation");
+assert.match(sw,/keys\.filter\(k=>k\.startsWith\(CACHE_PREFIX\)&&k!==CACHE_NAME\)/,"cache cleanup cannot delete another app's caches");
+assert.match(sw,/sitter-mode\.js/,"service worker treats the sitter module as an app-shell/core asset");
+assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the toolbar uses the toolbar color");
+assert.match(css,/body\{[\s\S]*?position:fixed;[\s\S]*?inset:0;/,"the known baseline body remains the viewport owner");
+assert.match(css,/\.app\{[\s\S]*?position:fixed !important;[\s\S]*?overflow-y:auto;/,"the known baseline content region remains the app scroller");
+assert.match(css,/\.bottom-nav\{[\s\S]*?position:absolute !important;/,"navigation remains anchored to the fixed viewport body");
+assert.doesNotMatch(css,/\.bottom-nav\{[^}]*position:fixed/,"navigation never uses iOS position fixed");
+assert.match(css,/Sitter Mode rewrite v1/,"rewritten sitter screen has isolated styles");
+assert.doesNotMatch(css,/\.sitter-page-actions\{position:sticky/,"sitter controls do not add another sticky/fixed compositor layer");
+assert.doesNotMatch(html,/class="app-shell"/,"the later structural app-shell rewrite is not present");
+assert.match(app,/setTimeout\(dismissSplash,3000\)/,"the baseline splash timing is untouched");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
 assert.doesNotMatch(worker,/LEGACY_FAMILY_TOKEN\s*=\s*["']/,"legacy credential is not embedded");
@@ -62,7 +105,6 @@ assert.match(worker,/credential_hash/,"device credentials are stored by hash");
 assert.match(worker,/used_at IS NULL AND expires_at > CURRENT_TIMESTAMP/,"invite claim is single-use and expiry checked");
 assert.match(worker,/revoked_at/,"revoked credentials are rejected");
 assert.match(worker,/frannie_recovery_links/,"recovery links are hashed, server-held, and revocable");
-assert.match(worker,/activatedByDeviceId/,"recovery pairing transfers matching active sitter ownership");
 
 const manifest=JSON.parse(fs.readFileSync(new URL("manifest.json",root),"utf8"));
 assert.equal(manifest.display,"standalone","official manifest installs as a standalone PWA");
@@ -77,4 +119,4 @@ assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video l
 assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
-console.log("PASS: 47 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, care UI, and PWA regression assertions");
+console.log("PASS: 67 Frannie baseline, sitter rewrite, ownership, durable sync, audit, cache, navigation, assets, training, care, and Worker regression assertions");

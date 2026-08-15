@@ -58,7 +58,7 @@ textarea{min-height:90px;resize:vertical}
 .rating{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .rating button{border:1px solid var(--line);background:#fffaf7;border-radius:12px;padding:11px;font-weight:850}
 .rating button.active{background:#efdce2;border-color:var(--pink3)}
-.bottom-nav{position:fixed;z-index:10;left:50%;bottom:11px;transform:translateX(-50%);width:min(94%,620px);display:grid;grid-template-columns:repeat(4,1fr);padding:7px;background:rgba(27,23,25,.96);border-radius:18px;box-shadow:var(--shadow)}
+.bottom-nav{position:absolute;z-index:10;left:50%;bottom:11px;transform:translateX(-50%);width:min(94%,620px);display:grid;grid-template-columns:repeat(4,1fr);padding:7px;background:rgba(27,23,25,.96);border-radius:18px;box-shadow:var(--shadow)}
 .nav{border:0;background:transparent;color:#e8dfe2;padding:9px 3px;border-radius:12px;font-size:.71rem;font-weight:900} .nav.active{background:var(--pink2);color:#2b2023}
 .modal{position:fixed;z-index:100;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:16px}
 .modal.open{display:flex} .modal-box{width:min(100%,900px);background:#191719;border-radius:18px;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.6)}
@@ -148,7 +148,7 @@ textarea{min-height:90px;resize:vertical}
 .save-confirm{margin-top:10px;padding:10px 12px;border-radius:12px;background:#e3ece5;color:#3f5d48;border:1px solid #bfd1c3;font-weight:900}
 html,body{overscroll-behavior-y:none}
 .app{padding-bottom:118px}
-.bottom-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;border-radius:18px 18px 0 0!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;min-height:82px;margin:0!important}
+.bottom-nav{position:absolute!important;left:0!important;right:0!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;border-radius:18px 18px 0 0!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;min-height:82px;margin:0!important}
 .quick-log-entry{margin-top:15px;padding:14px;border:1px solid var(--line);background:#fffaf7;border-radius:16px}
 .print-only{display:none}
 @page{margin:.35in}
@@ -174,7 +174,7 @@ html,body{overscroll-behavior-y:none}
   html[data-print-mode="letter"] .print-only p{font-size:11px}
 }
 
-/* Stable iPhone bottom navigation */
+/* Stable iPhone bottom navigation anchored to the already fixed viewport body. */
 html,body{
   width:100%;
   height:100%;
@@ -202,7 +202,7 @@ body{
   margin:0;
 }
 .bottom-nav{
-  position:fixed !important;
+  position:absolute !important;
   z-index:9999 !important;
   left:0 !important;
   right:0 !important;
@@ -306,7 +306,6 @@ html.install-required .install-curtain{
 .care-cloud-panel h3{margin:0 0 3px}.care-cloud-panel p{margin:0;font-size:.8rem;font-weight:800;color:#69535a}
 .care-cloud-panel p[data-tone="success"]{color:#3f684a}.care-cloud-panel p[data-tone="error"]{color:#8a3f3d}.care-cloud-panel p[data-tone="working"]{color:#765622}
 .care-cloud-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.care-cloud-actions input{flex:1 1 190px;min-width:0}
-.sitter-modal{z-index:12000}.sitter-modal-box{max-height:min(88dvh,760px);display:flex;flex-direction:column}.sitter-modal-body{padding:14px;overflow-y:auto;background:#fff7f3}
 .sitter-checklist{display:flex;gap:8px;align-items:center;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line);border-radius:12px;background:#f5e8ec;font-weight:850}
 .sitter-checklist input{width:auto}.sitter-view-section{padding:11px 12px;margin:9px 0;border:1px solid var(--line);border-radius:13px;background:#fffdfb}
 .sitter-view-section h3{margin:0 0 6px;color:#704753}.sitter-view-section ul{margin:0;padding-left:20px}.sitter-view-section li{margin:5px 0;line-height:1.4}.sitter-view-section li input{width:auto;margin-right:5px}
@@ -326,23 +325,14 @@ html.install-required .install-curtain{
 .sitter-paw{font-size:1.15rem;line-height:1}
 @media(max-width:420px){.sitter-active-banner{gap:7px;padding:11px 10px}.sitter-active-banner strong{font-size:.82rem}.sitter-active-banner small{font-size:.68rem}.sitter-paw{font-size:1rem}}
 
-/* Final shared-care cleanup: explicit audit timestamps, Passwords hint, sitter entry alert */
+/* Final shared-care cleanup: explicit audit timestamps and Passwords hint */
 .password-autofill-note{grid-column:1/-1;margin:0!important;font-size:.72rem!important;font-weight:750!important;color:#765f66!important}
 .care-activity li{display:block!important;padding:9px 10px!important}
 .activity-entry-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px}
 .activity-entry-head strong{font-size:.82rem;color:#704753}
 .activity-entry-head time{font-size:.72rem;font-weight:900;color:#5e4b51;white-space:nowrap}
 .care-activity li>span{display:block;font-size:.84rem;line-height:1.35;color:#493c40}
-.sitter-entry-alert{z-index:13000;background:rgba(35,13,18,.82);backdrop-filter:blur(5px)}
-.sitter-entry-card{width:min(92vw,430px);padding:24px 20px 20px;border-radius:22px;background:#fff8f5;border:4px solid #9e2f44;box-shadow:0 24px 80px rgba(54,8,20,.52),0 0 0 6px rgba(158,47,68,.15);text-align:center;color:#3d292e}
-.sitter-entry-paws{font-size:1.45rem;margin-bottom:5px}
-.sitter-entry-kicker{font-size:.72rem;letter-spacing:.16em;font-weight:950;color:#9e2f44;margin-bottom:6px}
-.sitter-entry-card h2{margin:0 0 8px;font-size:1.65rem;color:#76263a}
-.sitter-entry-card p{margin:7px 0;line-height:1.4}
-.sitter-entry-card #sitterEntryAlertMeta{font-weight:900;color:#6d3846}
-.sitter-entry-copy{font-size:.88rem;color:#5d4a50}
-.sitter-entry-card button{width:100%;margin-top:12px;background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
-@media(max-width:420px){.activity-entry-head{align-items:flex-start;flex-direction:column;gap:1px}.activity-entry-head time{white-space:normal}.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}
+@media(max-width:420px){.activity-entry-head{align-items:flex-start;flex-direction:column;gap:1px}.activity-entry-head time{white-space:normal}}
 
 /* Compact long Care histories: newest record stays visible; older records expand on demand. */
 .care-history-collapse{margin:10px 0 0;border-top:1px solid rgba(132,79,91,.18);padding-top:8px}
@@ -447,7 +437,7 @@ html.install-required .install-curtain{
 .care-history-toggle::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s ease}
 .care-history-toggle[aria-expanded="true"]::before{transform:rotate(90deg)}
 .problem{touch-action:manipulation}
-.sitter-entry-alert,.connection-setup-modal{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.connection-setup-modal{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 .setup-recovery-link{
   display:inline-block;margin:10px 0 0;padding:0;border:0;background:transparent;color:#875363;
   text-decoration:underline;font:inherit;font-size:.78rem;font-weight:850;cursor:pointer;
@@ -457,5 +447,17 @@ html.install-required .install-curtain{
 
 
 /* BTR v2.2 */
-.sitter-modal input[type="checkbox"]{touch-action:manipulation}
+.sitter-page-screen input[type="checkbox"]{touch-action:manipulation}
 .care-history-toggle{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+
+/* Sitter Mode rewrite v1 — normal app screen, never a fixed modal/backdrop */
+.sitter-page-screen{padding-top:2px}
+.sitter-page-card{margin-top:16px}
+.sitter-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.sitter-page-head h2{margin:2px 0 5px}
+.sitter-page-head p{margin:0;color:#6d5960;font-weight:750}
+.sitter-page-head .eyebrow{color:var(--pink3)}
+.sitter-page-notice{margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:#f9e3ea;color:#633844;font-weight:800;line-height:1.4}
+.sitter-page-actions{padding:10px 0 2px;background:#fff8f2}
+@media(max-width:520px){.sitter-page-head{flex-direction:column}.sitter-page-head>button{width:100%}.sitter-page-actions button{flex:1 1 46%}}

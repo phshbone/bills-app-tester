@@ -7,10 +7,9 @@
   const LOCAL_DEVICE_KEY="frannieCareLocalDeviceIdV1";
   const INVITE_KEY="franniePendingInviteV1";
   const SYNC_KEY="frannieCareSyncV1";
-  const SITTER_INTENT_KEY="frannieCareSitterIntentV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
-  const BUILD_ID="CODEX-v3.3 · cache v38";
+  const BUILD_ID="SITTER-REWRITE-v1 · isolated cache v2";
   const CONNECTION_COOKIE="frannieFamilyConnectionV1";
   const USER_COOKIE="frannieFamilyUserV1";
   const INVITE_COOKIE="franniePendingInviteV1";
@@ -63,29 +62,8 @@
   let syncAgain=false;
   let suppressSync=false;
   let lastCareSnapshot=null;
-  let sitterDismissedThisForeground=false;
-  let sitterActiveIntent=loadSitterIntent();
   let focusSelectionIntent=null;
-  const sitterChecklistChecks=new Set();
-
-  function sitterChecklistKey(sectionTitle,index,item){
-    return `${sectionTitle}::${index}::${String(item||"")}`;
-  }
-
-  function loadSitterIntent(){
-    try{
-      const saved=JSON.parse(localStorage.getItem(SITTER_INTENT_KEY)||"null");
-      return saved&&typeof saved.active==="boolean"?saved.active:null;
-    }catch{return null}
-  }
-  function setSitterIntent(active){
-    sitterActiveIntent=Boolean(active);
-    localStorage.setItem(SITTER_INTENT_KEY,JSON.stringify({active:sitterActiveIntent,at:new Date().toISOString()}));
-  }
-  function clearSitterIntent(){
-    sitterActiveIntent=null;
-    localStorage.removeItem(SITTER_INTENT_KEY);
-  }
+  let sitterMode=null;
 
   const TRACKED_ARRAYS={
     treatments:{label:"treatment / vaccination",name:item=>item?.name||item?.type||"item"},
@@ -97,22 +75,6 @@
     logs:{label:"training log entry",name:item=>item?.lesson||"session"}
   };
 
-  function sameActor(left,right){
-    return String(left||"").trim().toLocaleLowerCase()===String(right||"").trim().toLocaleLowerCase();
-  }
-
-  function canEndSitter(){
-    if(!state.sitter?.active)return false;
-    const ownerDevice=(state.sitter?.activatedByDeviceId||"").trim();
-    const owner=(state.sitter?.activatedBy||"").trim();
-    const thisDeviceIds=[deviceInfo?.id,localDeviceId].map(value=>String(value||"").trim()).filter(Boolean);
-    const sameNamedOwner=Boolean(owner&&userName&&sameActor(owner,userName));
-    // Prefer exact device ownership, but do not permanently strand a sitter
-    // session after a reinstall, recovery pairing, or local device-id change.
-    // The same named family member may reclaim and end their active session.
-    if(ownerDevice)return thisDeviceIds.includes(ownerDevice)||sameNamedOwner;
-    return !owner||sameNamedOwner;
-  }
 
   function careSnapshot(data=currentShared()){
     const snap=core.normalize(data);
@@ -199,8 +161,8 @@
   }
 
   function saveUserName(){
-    if(state.sitter?.active){
-      alert("End the active sitter directions before changing this device name.");
+    if(state.sitter?.active&&sitterMode?.isOwner?.()){
+      alert("End your active Sitter Mode session before changing your name on this device.");
       return;
     }
     const input=document.getElementById("cloudCareUserName");
@@ -231,8 +193,8 @@
   }
 
   function editUserName(){
-    if(state.sitter?.active){
-      alert("End the active sitter directions before changing this device name.");
+    if(state.sitter?.active&&sitterMode?.isOwner?.()){
+      alert("End your active Sitter Mode session before changing your name on this device.");
       return;
     }
     document.getElementById("cloudCareIdentityEditor")?.classList.remove("hidden");
@@ -308,14 +270,12 @@
 
   function applyShared(data){
     const shared=core.normalize(data);
+    if(sitterMode)shared.sitter=sitterMode.resolveRemote(shared.sitter).sitter;
     suppressSync=true;
     try{
       state.profile=shared.profile?{...shared.profile}:null;
       core.ARRAY_FIELDS.forEach(field=>{state[field]=shared[field]});
       state.sitter=shared.sitter;
-      if(sitterActiveIntent!==null){
-        state.sitter={...(state.sitter||{}),active:sitterActiveIntent};
-      }
       Store.save(state);
       initializeUI();
       fillSitterEditor();
@@ -396,78 +356,64 @@
           result=await saveRemote(firstConnectMerged,result.version||0);
         }
       }
-      const responseShared=core.normalize(result.data||local);
+
+      let serverState=core.normalize(result.data||local);
       let shared=localChanged&&!forcePull
-        ? core.merge(syncMeta.base,local,responseShared)
-        : responseShared;
+        ? core.merge(syncMeta.base,local,serverState)
+        : serverState;
+
       if(localChanged&&!forcePull){
         const base=core.normalize(syncMeta.base);
         core.PRIMITIVE_ARRAY_FIELDS.forEach(field=>{
           if(!core.same(local[field],base[field]))shared[field]=Array.isArray(local[field])?[...local[field]]:[];
         });
       }
-      if(focusSelectionIntent!==null){
-        shared.selected=[...focusSelectionIntent];
-      }
-      if(sitterActiveIntent!==null){
-        shared.sitter={...(shared.sitter||{}),active:sitterActiveIntent};
-        if(sitterActiveIntent){
-          shared.sitter.activatedAt=state.sitter?.activatedAt||shared.sitter.activatedAt||new Date().toISOString();
-          shared.sitter.activatedBy=state.sitter?.activatedBy||shared.sitter.activatedBy||userName||"Unknown device";
-          shared.sitter.activatedByDeviceId=state.sitter?.activatedByDeviceId||shared.sitter.activatedByDeviceId||deviceInfo?.id||localDeviceId;
-          shared.sitter.sessionId=state.sitter?.sessionId||shared.sitter.sessionId||"";
+      if(focusSelectionIntent!==null)shared.selected=[...focusSelectionIntent];
+
+      // Sitter Mode has one state owner and one durable mutation id. A local
+      // Activate / Update / End command stays authoritative until the Worker
+      // returns that exact mutation id. No modal/view event can change it.
+      if(sitterMode){
+        const sitterResolution=sitterMode.resolveRemote(serverState.sitter);
+        shared.sitter=sitterResolution.sitter;
+        const focusNeedsWrite=focusSelectionIntent!==null&&!core.same(serverState.selected||[],focusSelectionIntent);
+        if(sitterResolution.mustWrite||focusNeedsWrite){
+          result=await saveRemote(shared,result.version||0);
+          serverState=core.normalize(result.data||shared);
+          sitterMode.acknowledge(serverState.sitter);
+          shared=serverState;
         }
-      }
-      // An intent applied after a GET/merge is still dirty until the server has
-      // acknowledged it. Older code stored the intent-adjusted value as the
-      // sync base before writing it, so the next pass saw no local change and a
-      // stale remote `sitter.active:false` could win forever.
-      const serverState=core.normalize(result.data||{});
-      const sitterNeedsWrite=sitterActiveIntent!==null&&Boolean(serverState.sitter?.active)!==sitterActiveIntent;
-      const focusNeedsWrite=focusSelectionIntent!==null&&!core.same(serverState.selected||[],focusSelectionIntent);
-      if(sitterNeedsWrite||focusNeedsWrite){
+      }else if(focusSelectionIntent!==null&&!core.same(serverState.selected||[],focusSelectionIntent)){
         result=await saveRemote(shared,result.version||0);
-        shared=core.normalize(result.data||shared);
-      }
-      // Keep the server acknowledgement separate from the state we render.
-      // A successful HTTP response is not enough: the returned sitter state
-      // must acknowledge the pending activation before it can replace the
-      // locally activated session on this device.
-      const acknowledgedServer=core.normalize(result.data||{});
-      const sitterAcknowledged=sitterActiveIntent===null||Boolean(acknowledgedServer.sitter?.active)===sitterActiveIntent;
-      let appliedShared=core.normalize(shared);
-      if(sitterActiveIntent!==null&&!sitterAcknowledged){
-        appliedShared.sitter={...core.normalize({sitter:state.sitter}).sitter,active:sitterActiveIntent};
+        serverState=core.normalize(result.data||shared);
+        shared=serverState;
       }
 
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
-      // The sync base must represent what the server actually acknowledged,
-      // never the optimistic sitter state still waiting to be accepted.
-      syncMeta={version:result.version||0,base:acknowledgedServer,updatedAt:result.updatedAt||null};
+      syncMeta={version:result.version||0,base:serverState,updatedAt:result.updatedAt||null};
       saveSyncMeta();
+
       if(changedDuringSync){
-        const preserved=core.merge(local,newestLocal,appliedShared);
+        const preserved=core.merge(local,newestLocal,serverState);
         if(focusSelectionIntent!==null)preserved.selected=[...focusSelectionIntent];
-        if(sitterActiveIntent!==null)preserved.sitter={...(preserved.sitter||{}),...core.normalize({sitter:state.sitter}).sitter,active:sitterActiveIntent};
+        if(sitterMode)preserved.sitter=sitterMode.resolveRemote(serverState.sitter).sitter;
         applyShared(preserved);
         syncAgain=true;
         status("Saving a newer care change…","working");
       }else{
-        applyShared(appliedShared);
-        status(sitterAcknowledged?"Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""):"Saving sitter activation…",sitterAcknowledged?"success":"working");
+        const applied=core.normalize(shared);
+        if(sitterMode)applied.sitter=sitterMode.resolveRemote(serverState.sitter).sitter;
+        applyShared(applied);
+        status("Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
       }
+
       if(focusSelectionIntent!==null){
-        const remoteSelected=acknowledgedServer.selected||[];
+        const remoteSelected=serverState.selected||[];
         if(core.same(remoteSelected,focusSelectionIntent))focusSelectionIntent=null;
         else syncAgain=true;
       }
-      if(sitterActiveIntent!==null&&sitterAcknowledged){
-        clearSitterIntent();
-      }else if(sitterActiveIntent!==null){
-        syncAgain=true;
-      }
-      if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,60);
+      if(sitterMode?.hasPending?.())syncAgain=true;
     }catch(error){
       console.warn("Frannie shared-care sync failed",error);
       status(error.status===401?"Connection code not accepted":"Offline — changes are safe on this device and will retry","error");
@@ -607,113 +553,7 @@
     };
   }
 
-  function saveSitterInstructions(){
-    const current=state.sitter||{};
-    if(current.active&&!canEndSitter()){
-      alert(`Only ${current.activatedBy||"the person who activated sitter mode"} can edit the active directions. You can still view them.`);
-      fillSitterEditor();
-      return;
-    }
-    state.sitter={...readSitterEditor(),active:Boolean(current.active),activatedAt:current.activatedAt||"",activatedBy:current.activatedBy||"",activatedByDeviceId:current.activatedByDeviceId||"",sessionId:current.sessionId||""};
-    if(persist()){
-      renderSitterView();renderSitterBanner();
-      const saved=document.getElementById("sitterSaved");saved?.classList.remove("hidden");setTimeout(()=>saved?.classList.add("hidden"),2600);
-    }
-  }
-
-  async function activateSitterInstructions(){
-    if(state.sitter?.active&&!canEndSitter()){
-      alert(`Sitter mode is already controlled by ${state.sitter?.activatedBy||"the person who activated it"}. You can view the directions, but only that person can update or end the active mode.`);
-      return;
-    }
-    const draft=readSitterEditor();
-    if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
-    state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device",activatedByDeviceId:deviceInfo?.id||localDeviceId,sessionId:(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2))};
-    setSitterIntent(true);
-    sitterDismissedThisForeground=false;
-    if(persist()){
-      fillSitterEditor();renderSitterView();renderSitterBanner();
-      if(connectionCode)await synchronize();
-      openSitter();
-    }
-  }
-
-  async function endSitterInstructions(){
-    if(!state.sitter?.active)return;
-    if(!canEndSitter()){
-      alert(`Only ${state.sitter?.activatedBy||"the person who activated sitter mode"} can end these sitter directions.`);
-      return;
-    }
-    if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
-    state.sitter={...state.sitter,active:false};
-    setSitterIntent(false);
-    document.getElementById("sitterEntryAlert")?.classList.remove("open");
-    if(persist()){
-      renderSitterBanner();renderSitterView();
-      if(connectionCode)await synchronize();
-    }
-  }
-
-  function splashDismissed(){
-    const splash=document.getElementById("splashScreen");
-    return !splash||splash.classList.contains("hide")||splash.getAttribute("aria-hidden")==="true";
-  }
-
-  function showSitterEntryAlert(){
-    if(sitterDismissedThisForeground||!state.sitter?.active||!splashDismissed())return;
-    const alertModal=document.getElementById("sitterEntryAlert");
-    if(!alertModal||alertModal.classList.contains("open"))return;
-    const by=document.getElementById("sitterEntryAlertMeta");
-    let detail="Active sitter directions are waiting for you.";
-    if(state.sitter?.activatedBy)detail=`Directions activated by ${state.sitter.activatedBy}.`;
-    if(by)by.textContent=detail;
-    alertModal.classList.add("open");
-  }
-
-  function continueToSitterInstructions(){
-    sitterDismissedThisForeground=true;
-    const alertModal=document.getElementById("sitterEntryAlert");
-    alertModal?.classList.remove("open");
-    try{if(typeof globalThis.showScreen==="function")globalThis.showScreen("care")}catch{}
-    openSitter();
-  }
-
-  function renderSitterBanner(){
-    const banner=document.getElementById("sitterActiveBanner");
-    if(!banner)return;
-    const active=Boolean(state.sitter?.active);
-    banner.classList.toggle("hidden",!active);
-    if(active){
-      const meta=document.getElementById("sitterActiveMeta");
-      let detail="Tap to view current directions";
-      if(state.sitter?.activatedBy)detail=`Activated by ${state.sitter.activatedBy}`;
-      if(state.sitter?.activatedAt){
-        try{detail+=` · ${new Date(state.sitter.activatedAt).toLocaleString()}`}catch{}
-      }
-      if(meta)meta.textContent=detail;
-      setTimeout(showSitterEntryAlert,120);
-    }
-    const end=document.getElementById("endSitterInstructions");
-    if(end){
-      end.classList.toggle("hidden",!active);
-      const allowed=canEndSitter();
-      end.disabled=active&&!allowed;
-      end.textContent=active&&!allowed?`Only ${state.sitter?.activatedBy||"activator"} can end`:"End sitter directions";
-      end.title=active&&!allowed?`Sitter mode was activated by ${state.sitter?.activatedBy||"another family member"}.`:"";
-    }
-    const activate=document.getElementById("activateSitterInstructions");
-    if(activate){
-      // Once sitter mode is active, Save draft updates the active directions.
-      // Do not make the user "re-activate" an already active mode.
-      activate.disabled=false;
-      activate.classList.toggle("hidden",active);
-      activate.textContent="Activate sitter directions";
-      activate.title="";
-    }
-  }
-
-  function fillSitterEditor(){
-    const sitter=state.sitter||{};
+  function fillSitterEditor(sitter=state.sitter||{}){
     const values={sitterPotty:sitter.pottyRoutine||"",sitterCrate:sitter.crateSleep||"",sitterEmergency:sitter.emergencyVet||"",sitterInstructions:sitter.instructions||""};
     Object.entries(values).forEach(([id,value])=>{const element=document.getElementById(id);if(element&&document.activeElement!==element)element.value=value});
   }
@@ -721,7 +561,6 @@
   function sitterSections(){
     const currentFood=(state.feedingItems||[]).filter(item=>item.active===true);
     const currentMedication=(state.treatments||[]).filter(item=>item.type==="Medication"&&item.active===true);
-    // Allergies/cautions already use Remove to leave the current list, so every remaining caution is current.
     const currentCautions=(state.allergies||[]);
     return [
       {title:"Food & feeding",items:currentFood.map(item=>[item.category,item.brand,item.amount,item.schedule,item.note].filter(Boolean).join(" · "))},
@@ -734,55 +573,19 @@
     ];
   }
 
-  function sitterHtml({checklist=false,print=false}={}){
-    return sitterSections().map(section=>{
-      const hasItems=section.items.length>0;
-      const items=hasItems?section.items:["Not added yet"];
-      const list=items.map((item,index)=>{
-        let control="";
-        if(checklist&&hasItems){
-          if(print)control="□ ";
-          else{
-            const key=sitterChecklistKey(section.title,index,item);
-            control=`<input type="checkbox" data-sitter-check="${esc(key)}" aria-label="Mark complete"${sitterChecklistChecks.has(key)?" checked":""}> `;
-          }
-        }
-        return `<li>${control}${esc(item)}</li>`;
-      }).join("");
-      return `<section class="sitter-view-section"><h3>${esc(section.title)}</h3><ul>${list}</ul></section>`;
-    }).join("");
+  function splashDismissed(){
+    const splash=document.getElementById("splashScreen");
+    return !splash||splash.classList.contains("hide")||splash.getAttribute("aria-hidden")==="true";
   }
 
-  function renderSitterView(){
-    const content=document.getElementById("sitterViewContent");
-    if(!content)return;
-    const checklist=document.getElementById("sitterChecklistToggle")?.checked||false;
-    content.innerHTML=sitterHtml({checklist});
-  }
+  function renderSitterView(){sitterMode?.renderAll?.()}
+  function renderSitterBanner(){sitterMode?.renderAll?.()}
+  function openSitter(){sitterMode?.openView?.()}
+  function closeSitter(){sitterMode?.closeView?.()}
 
-  function releaseModalState(){
-    // The app shell already owns scrolling. Modals only toggle their open
-    // class, avoiding body-style/compositing churn in iOS WebKit.
-    document.activeElement?.blur?.();
-  }
-  function openSitter(){renderSitterView();document.getElementById("sitterModal")?.classList.add("open")}
-  function closeSitter(){document.getElementById("sitterModal")?.classList.remove("open");releaseModalState()}
-
-  async function shareSitter(){
-    const lines=["Frannie’s Sitter",...sitterSections().flatMap(section=>["",section.title,...section.items.map(item=>"- "+item)])];
-    const text=lines.join("\n");
-    if(navigator.share){try{await navigator.share({title:"Frannie’s Sitter",text});return}catch(error){if(error.name==="AbortError")return}}
-    try{await navigator.clipboard.writeText(text);alert("Frannie’s sitter information was copied.")}catch{alert("Sharing is not available on this device. Use Print / PDF instead.")}
-  }
-
-  function printSitter(){
-    const checklist=document.getElementById("sitterChecklistToggle")?.checked||false;
-    const report=document.getElementById("printReport");
-    report.innerHTML=`<section class="print-card"><h1>Frannie’s Sitter</h1><p class="print-profile">Current caretaker reference</p>${sitterHtml({checklist,print:true})}</section>`;
-    document.documentElement.dataset.printMode="letter";
-    const cleanup=()=>{delete document.documentElement.dataset.printMode;window.removeEventListener("afterprint",cleanup)};
-    window.addEventListener("afterprint",cleanup);void report.offsetHeight;window.print();
-  }
+  // Generic cleanup for the remaining connection dialog. Sitter Mode itself
+  // no longer uses a modal or backdrop.
+  function releaseModalState(){document.activeElement?.blur?.()}
 
   function buildUI(){
     const careCard=document.querySelector("#care > .card");
@@ -843,20 +646,26 @@
 
     const editor=document.createElement("div");
     editor.className="care-section full";editor.id="sitterEditor";
-    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>Save directions as a shared draft while planning. When it is time for the sitter, activate them so everyone sees the Sitter Instructions Ready banner.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions"><button class="secondary" id="saveSitterInstructions" type="button">Save draft</button><button class="primary" id="activateSitterInstructions" type="button">Activate sitter directions</button><button class="secondary hidden" id="endSitterInstructions" type="button">End sitter directions</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instruction draft saved.</div>`;
+    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>Sitter Mode is a live care sheet. The person who activates a session owns it until that same person ends it. The owner can update these instructions at any time while the session stays active.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions"><button class="secondary" id="saveSitterInstructions" type="button">Save draft</button><button class="primary" id="activateSitterInstructions" type="button">Activate Sitter Mode</button><button class="secondary hidden" id="endSitterInstructions" type="button">End Sitter Mode</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instruction draft saved.</div>`;
     const timeline=Array.from(careGrid.children).find(item=>item.querySelector("h3")?.textContent.includes("Frannie timeline"));
     careGrid.insertBefore(editor,timeline||null);
 
-    const modal=document.createElement("div");
-    modal.className="modal sitter-modal";modal.id="sitterModal";
-    modal.innerHTML=`<div class="modal-box sitter-modal-box"><div class="modal-head"><strong>Frannie’s Sitter</strong><button id="closeSitterView" type="button">Close ✕</button></div><div class="sitter-modal-body"><label class="sitter-checklist"><input id="sitterChecklistToggle" type="checkbox"> Add a temporary caretaker checklist</label><div id="sitterViewContent"></div><div class="actions"><button class="primary" id="shareSitterView" type="button">Share</button><button class="secondary" id="printSitterView" type="button">Print / PDF</button></div></div></div>`;
-    document.body.appendChild(modal);
 
-    const entryAlert=document.createElement("div");
-    entryAlert.className="modal sitter-entry-alert";entryAlert.id="sitterEntryAlert";
-    entryAlert.setAttribute("role","dialog");entryAlert.setAttribute("aria-modal","true");entryAlert.setAttribute("aria-labelledby","sitterEntryAlertTitle");
-    entryAlert.innerHTML=`<div class="sitter-entry-card"><div class="sitter-entry-paws" aria-hidden="true">🐾 &nbsp; 🐾</div><div class="sitter-entry-kicker">CARETAKER ALERT</div><h2 id="sitterEntryAlertTitle">Puppy Sitting Mode</h2><p id="sitterEntryAlertMeta">Active sitter directions are waiting for you.</p><p class="sitter-entry-copy">Please review Frannie’s current food, medication, routine, cautions, and sitter-specific instructions before continuing.</p><button id="continueToSitterInstructions" class="primary" type="button">View sitter instructions</button></div>`;
-    document.body.appendChild(entryAlert);
+    sitterMode=globalThis.FrannieSitterMode?.create?.({
+      getSitter:()=>state.sitter,
+      setSitter:value=>{state.sitter=value},
+      getUser:()=>userName,
+      readEditor:readSitterEditor,
+      fillEditor:fillSitterEditor,
+      sections:sitterSections,
+      escape:esc,
+      showScreen:id=>globalThis.showScreen(id),
+      splashDismissed,
+      setActivity:action=>setNextActivity(action),
+      persist:()=>persist(),
+      saveLocalOnly:()=>Store.save(state),
+      syncSoon:()=>scheduleSync()
+    })||null;
 
     const connectModal=document.createElement("div");
     connectModal.className="modal connection-setup-modal";connectModal.id="connectionSetupModal";
@@ -899,25 +708,11 @@
     document.getElementById("cloudCareShareSetup").addEventListener("click",shareSetupLink);
     document.getElementById("cloudCareRecoveryLink").addEventListener("click",shareRecoveryLink);
     document.getElementById("cloudCareDisconnect").addEventListener("click",disconnect);
-    document.getElementById("saveSitterInstructions").addEventListener("click",saveSitterInstructions);
-    document.getElementById("activateSitterInstructions").addEventListener("click",activateSitterInstructions);
-    document.getElementById("endSitterInstructions").addEventListener("click",endSitterInstructions);
-    document.getElementById("openSitterView").addEventListener("click",openSitter);
-    document.getElementById("closeSitterView").addEventListener("click",closeSitter);
-    document.getElementById("sitterChecklistToggle").addEventListener("change",renderSitterView);
-    document.getElementById("sitterViewContent").addEventListener("change",event=>{
-      const checkbox=event.target.closest("input[data-sitter-check]");
-      if(!checkbox)return;
-      const key=checkbox.dataset.sitterCheck||"";
-      if(!key)return;
-      if(checkbox.checked)sitterChecklistChecks.add(key);
-      else sitterChecklistChecks.delete(key);
-    });
-    document.getElementById("shareSitterView").addEventListener("click",shareSitter);
-    document.getElementById("printSitterView").addEventListener("click",printSitter);
-    document.getElementById("continueToSitterInstructions").addEventListener("click",continueToSitterInstructions);
-    modal.addEventListener("click",event=>{if(event.target===modal)closeSitter()});
-    renderConnectionControls();renderIdentityControls();fillSitterEditor();renderSitterView();renderSitterBanner();renderActivityLog();
+    document.getElementById("saveSitterInstructions").addEventListener("click",()=>sitterMode?.saveInstructions?.());
+    document.getElementById("activateSitterInstructions").addEventListener("click",()=>sitterMode?.activate?.());
+    document.getElementById("endSitterInstructions").addEventListener("click",()=>sitterMode?.end?.());
+    document.getElementById("openSitterView").addEventListener("click",()=>sitterMode?.openView?.("care"));
+    renderConnectionControls();renderIdentityControls();sitterMode?.renderAll?.();renderActivityLog();
     lastCareSnapshot=careSnapshot();
 
     if(needsIdentitySetup){
@@ -935,12 +730,8 @@
 
   globalThis.FrannieCloudSync={onLocalPersist,synchronize,setNextActivity,setFocusIntent};
   globalThis.FrannieSharedCare={
-    afterSplashDismiss:()=>{sitterDismissedThisForeground=false;setTimeout(showSitterEntryAlert,160)},
-    checkSitterMode:()=>{
-      if(!state.sitter?.active)return;
-      sitterDismissedThisForeground=false;
-      if(splashDismissed())showSitterEntryAlert();
-    }
+    afterSplashDismiss:()=>sitterMode?.afterSplashDismiss?.(),
+    checkSitterMode:()=>sitterMode?.onForeground?.()
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildUI,{once:true});else buildUI();
 
@@ -955,37 +746,24 @@
     }
   }
 
-  function forceSitterEntryAlert(){
-    if(!state.sitter?.active)return;
-    sitterDismissedThisForeground=false;
-    const showWhenReady=()=>{
-      if(!state.sitter?.active)return;
-      if(!splashDismissed()){
-        setTimeout(showWhenReady,120);
-        return;
-      }
-      showSitterEntryAlert();
-    };
-    showWhenReady();
-  }
-
-  // Fresh standalone launch and foreground return are enough. Avoid heartbeat
-  // and focus loops that repeatedly re-rendered the app while it was in use.
+  // Sitter Mode is a normal app screen, not a fixed modal. Foreground entry may
+  // open that screen when a session is active, but opening/closing the screen
+  // has no authority over active state.
   window.addEventListener("pageshow",()=>{
-    forceSitterEntryAlert();
+    sitterMode?.onForeground?.();
     refreshForAppEntry();
   });
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="hidden"){
-      sitterDismissedThisForeground=false;
+      sitterMode?.onHidden?.();
       return;
     }
-    forceSitterEntryAlert();
+    sitterMode?.onForeground?.();
     refreshForAppEntry();
   });
 
   setTimeout(()=>{
-    forceSitterEntryAlert();
+    sitterMode?.onForeground?.();
     refreshForAppEntry();
   },500);
 })();
