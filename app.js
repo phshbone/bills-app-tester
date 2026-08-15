@@ -149,6 +149,7 @@ function showScreen(id,btn){
   if(splash&&!splash.classList.contains("hide"))dismissSplash();
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   $(id).classList.add("active");
+  document.querySelector(".hero")?.classList.toggle("header-compact",id!=="home");
   document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
   if(btn)btn.classList.add("active");
   else{const map={home:0,care:1,plan:2,log:3,safety:4};if(map[id]!==undefined)document.querySelectorAll(".nav")[map[id]].classList.add("active")}
