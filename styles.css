@@ -460,13 +460,19 @@ html.install-required .install-curtain{
 .care-history-toggle{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 
-/* Sitter Mode rewrite v1 — normal app screen, never a fixed modal/backdrop */
-.sitter-page-screen{padding-top:2px}
-.sitter-page-card{margin-top:16px}
-.sitter-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
-.sitter-page-head h2{margin:2px 0 5px}
-.sitter-page-head p{margin:0;color:#6d5960;font-weight:750}
-.sitter-page-head .eyebrow{color:var(--pink3)}
-.sitter-page-notice{margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:#f9e3ea;color:#633844;font-weight:800;line-height:1.4}
-.sitter-page-actions{padding:10px 0 2px;background:#fff8f2}
-@media(max-width:520px){.sitter-page-head{flex-direction:column}.sitter-page-head>button{width:100%}.sitter-page-actions button{flex:1 1 46%}}
+/* Sitter Mode restored popup presentation — state remains in sitter-mode.js */
+.sitter-modal{z-index:12000;background:rgba(34,23,26,.64);-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.sitter-modal-box{max-height:min(88dvh,760px);display:flex;flex-direction:column}
+.sitter-modal-body{padding:14px;overflow-y:auto;background:#fff7f3;-webkit-overflow-scrolling:touch}
+.sitter-entry-alert{z-index:13000;background:rgba(35,13,18,.82);-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.sitter-entry-card{width:min(92vw,430px);padding:24px 20px 20px;border-radius:22px;background:#fff8f5;border:4px solid #9e2f44;box-shadow:0 24px 80px rgba(54,8,20,.52),0 0 0 6px rgba(158,47,68,.15);text-align:center;color:#3d292e}
+.sitter-entry-paws{font-size:1.45rem;margin-bottom:5px}
+.sitter-entry-kicker{font-size:.72rem;letter-spacing:.16em;font-weight:950;color:#9e2f44;margin-bottom:6px}
+.sitter-entry-card h2{margin:0 0 8px;font-size:1.65rem;color:#76263a}
+.sitter-entry-card p{margin:7px 0;line-height:1.4}
+.sitter-entry-card #sitterEntryAlertMeta{font-weight:900;color:#6d3846}
+.sitter-entry-copy{font-size:.88rem;color:#5d4a50}
+.sitter-entry-card button{width:100%;margin-top:10px}
+.sitter-entry-card #continueToSitterInstructions{background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
+.sitter-entry-dismiss{background:#fff8f5!important;color:#704753!important}
+@media(max-width:420px){.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}

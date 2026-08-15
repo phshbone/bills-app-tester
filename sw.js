@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'frannie-pr7-stable-';
-const CACHE_NAME = `${CACHE_PREFIX}v4`;
-const APP_SHELL = ['./','./index.html','./styles.css?v=37','./app.js?v=34','./shared-care-core.js?v=18','./sitter-mode.js?v=2','./shared-care.js?v=20','./frannies-training-update.js?v=2','./manifest.json','./assets/frannie-background.webp','./assets/frannie-photo.webp','./assets/icon-192.png','./assets/icon-512.png'];
+const CACHE_NAME = `${CACHE_PREFIX}v5`;
+const APP_SHELL = ['./','./index.html','./styles.css?v=38','./app.js?v=34','./shared-care-core.js?v=18','./sitter-mode.js?v=3','./shared-care.js?v=20','./frannies-training-update.js?v=2','./manifest.json','./assets/frannie-background.webp','./assets/frannie-photo.webp','./assets/icon-192.png','./assets/icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith(CACHE_PREFIX)&&k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim()});
 self.addEventListener('fetch',event=>{

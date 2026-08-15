@@ -56,7 +56,7 @@ assert.equal(decision.clearPending,true,"obsolete pending state is discarded ins
 const shared=fs.readFileSync(new URL("shared-care.js",root),"utf8");
 assert.match(shared,/sitterMode\.resolveRemote\(serverState\.sitter\)/,"shared-care sync delegates sitter reconciliation to the new module");
 assert.doesNotMatch(shared,/sitterActiveIntent|sitterDismissedThisForeground|canEndSitter/,"old sitter patch machinery is removed");
-assert.doesNotMatch(shared,/sitterModal|sitterEntryAlert|continueToSitterInstructions/,"old fixed sitter modal and entry overlay are removed");
+assert.doesNotMatch(shared,/sitterModal|sitterEntryAlert|continueToSitterInstructions/,"shared-care stays presentation-agnostic; sitter overlays live in the sitter module");
 assert.match(shared,/currentMedication=.*filter\(item=>item\.type==="Medication"&&item\.active===true\)/,"sitter includes every explicit current medication");
 assert.match(shared,/currentFood=.*filter\(item=>item\.active===true\)/,"sitter includes every explicit current feeding item");
 assert.doesNotMatch(shared,/searchParams\.set\("(?:connect|invite)",connectionCode\)/,"permanent credentials are never put in invite URLs");
@@ -70,8 +70,10 @@ assert.match(sitterSource,/PENDING_KEY="frannieSitterPendingV2"/,"sitter command
 assert.match(sitterSource,/Activated Sitter Mode/,"activation is explicitly attributed in the activity log");
 assert.match(sitterSource,/Ended Sitter Mode/,"deactivation is explicitly attributed in the activity log");
 assert.match(sitterSource,/Updated active sitter instructions/,"the active-session owner can update the live sitter sheet");
-assert.match(sitterSource,/screen\.id="sitterViewScreen"[\s\S]*screen\.className="screen sitter-page-screen"/,"caretaker view is a normal app screen rather than a modal overlay");
-assert.doesNotMatch(sitterSource,/className="modal|classList\.add\("open"\)|document\.body\.style\.overflow/,"rewritten sitter UI has no fixed modal/backdrop state");
+assert.match(sitterSource,/className="modal sitter-modal"[\s\S]*className="modal sitter-entry-alert"/,"caretaker alert and caretaker list are restored as separate overlays");
+assert.match(sitterSource,/Puppy Sitting Mode[\s\S]*View sitter instructions/,"the red caretaker alert restores the original sitter entry flow");
+assert.doesNotMatch(sitterSource,/sitterViewScreen|showScreen\("sitterViewScreen"\)/,"caretaker view no longer becomes an app screen");
+assert.doesNotMatch(sitterSource,/document\.body\.style\.overflow/,"sitter overlays never mutate body scrolling");
 assert.match(sitterSource,/Only \$\{current\.activatedBy[\s\S]*can edit the active instructions/,"non-owner cannot edit an active sitter session");
 assert.match(sitterSource,/Only \$\{current\.activatedBy[\s\S]*can end this sitter session/,"non-owner cannot end an active sitter session");
 
@@ -82,11 +84,11 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons retain a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=37","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=2","shared-care.js?v=20"]){
+for(const asset of ["styles.css?v=38","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=3","shared-care.js?v=20"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
 assert.match(sw,/frannie-pr7-stable-/,"service worker cache remains isolated to this app");
-assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v4`/,"structural shell repair advances the isolated cache generation");
+assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v5`/,"restored sitter UI advances the isolated cache generation");
 assert.match(sw,/keys\.filter\(k=>k\.startsWith\(CACHE_PREFIX\)&&k!==CACHE_NAME\)/,"cache cleanup cannot delete another app's caches");
 assert.match(sw,/sitter-mode\.js/,"service worker treats the sitter module as an app-shell/core asset");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the toolbar uses the toolbar color");
@@ -99,8 +101,8 @@ assert.match(css,/body\{\s*position:static !important;/,"body no longer owns a f
 assert.match(app,/document\.querySelector\("\.app-body"\)/,"screen navigation resets the single body scroller");
 assert.doesNotMatch(app,/requestAnimationFrame\(\(\)=>\{scroller\.scrollTop=0\}\)/,"navigation no longer performs a second competing scroll reset");
 assert.match(shared,/document\.querySelector\("\.app-body"\)/,"shared-care jump navigation uses the same single body scroller");
-assert.match(css,/Sitter Mode rewrite v1/,"rewritten sitter screen has isolated styles");
-assert.doesNotMatch(css,/\.sitter-page-actions\{position:sticky/,"sitter controls do not add another sticky/fixed compositor layer");
+assert.match(css,/Sitter Mode restored popup presentation/,"restored sitter overlays have isolated styling");
+assert.match(css,/sitter-entry-card[\s\S]*#9e2f44/,"caretaker alert restores the red-accent presentation");
 assert.match(app,/setTimeout\(dismissSplash,3000\)/,"the baseline splash timing is untouched");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
@@ -124,7 +126,7 @@ assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
 assert.match(sitterSource,/PRE_RELEASE_RESET_CUTOFF=Date\.parse\("2026-08-15T14:40:00\.000Z"\)/,"Pass 1 has a fixed pre-release sitter reset cutoff");
-assert.match(sitterSource,/function resetPreReleaseSession\(\)/,"Pass 1 defines a pre-release session reset path");
-assert.match(sitterSource,/if\(activatedAt>=PRE_RELEASE_RESET_CUTOFF\)return false;/,"post-cutoff sitter sessions are never auto-ended");
-assert.match(sitterSource,/Reset pre-release sitter test session/,"the reset is explicitly logged");
-console.log("PASS: Frannie sitter rewrite + structural app-shell navigation regression assertions");
+assert.match(sitterSource,/function isPreReleaseSession\(value\)/,"legacy test sessions are identified explicitly");
+assert.match(sitterSource,/if\(isPreReleaseSession\(remote\)\)[\s\S]*mustWrite:true/,"an old cloud-active session is force-ended through the shared sync write path");
+assert.match(sitterSource,/activatedAt<PRE_RELEASE_RESET_CUTOFF/,"post-cutoff sitter sessions are never auto-ended");
+console.log("PASS: Frannie restored sitter overlays + persistent ownership + structural app-shell regression assertions");
