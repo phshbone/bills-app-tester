@@ -20,8 +20,8 @@ jobs:
         with:
           node-version: 24
       - name: Apply surgical sitter acknowledgement repair
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
           p=Path('shared-care.js')
           s=p.read_text()
@@ -93,6 +93,7 @@ jobs:
           if old not in s:
               raise SystemExit('Expected sitter sync block not found; refusing broad repair')
           p.write_text(s.replace(old,new,1))
+          PY
       - name: Syntax check
         run: node --check shared-care.js
       - name: Repository regression tests
