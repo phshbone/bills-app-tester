@@ -180,7 +180,7 @@ if(sessionStorage.getItem("frannieSplashSeen")==="1"){
   const splash=$("splashScreen");
   if(splash){splash.classList.add("hide");splash.setAttribute("aria-hidden","true")}
 }else{
-  splashTimer=setTimeout(dismissSplash,5000);
+  splashTimer=setTimeout(dismissSplash,3000);
 }
 
 function treatmentStatus(x){if(x.type==="Medication")return x.active===true?["Ongoing","status-ongoing"]:["Ended","status-ended"];if(!x.due)return["Given","status-given"];const d=Math.ceil((new Date(x.due+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/86400000);return d<0?["Overdue","status-overdue"]:d<=30?["Due soon","status-due"]:["Given","status-given"]}
@@ -465,7 +465,7 @@ initializeUI();
 // Cache the app shell for installed-PWA/offline use.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=39').catch((error) => {
+    navigator.serviceWorker.register('./sw.js').catch((error) => {
       console.warn('Service worker registration failed:', error);
     });
   });
