@@ -45,9 +45,10 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=35","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=18"]){
+for(const asset of ["styles.css?v=35","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=19"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
+assert.doesNotMatch(shared,/confirm\("End the active sitter instructions/,"ending sitter mode does not invoke iOS's native confirmation overlay");
 assert.match(sw,/frannies-good-girl-v38/,"service worker cache version is v38");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the structural toolbar uses the toolbar color");
 assert.match(html,/<div class="app-shell">[\s\S]*<div class="app">[\s\S]*<nav class="bottom-nav"/,"the content scroller and navigation share one structural app shell");
@@ -76,4 +77,4 @@ assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video l
 assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
-console.log("PASS: 46 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, care UI, iOS app-shell, and PWA regression assertions");
+console.log("PASS: 47 Frannie state, sync, pairing, recovery, audit, native-confirm-free sitter ending, complete assets, training UI, care UI, iOS app-shell, and PWA regression assertions");

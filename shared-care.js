@@ -610,7 +610,6 @@
       alert(`Only ${state.sitter?.activatedBy||"the person who activated sitter mode"} can end these sitter directions.`);
       return;
     }
-    if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
     state.sitter={...state.sitter,active:false};
     sitterActiveIntent=false;
     document.getElementById("sitterEntryAlert")?.classList.remove("open");
