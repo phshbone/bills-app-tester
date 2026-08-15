@@ -408,29 +408,42 @@
         result=await saveRemote(shared,result.version||0);
         shared=core.normalize(result.data||shared);
       }
+      // Keep the server acknowledgement separate from the state we render.
+      // A successful HTTP response is not enough: the returned sitter state
+      // must acknowledge the pending activation before it can replace the
+      // locally activated session on this device.
+      const acknowledgedServer=core.normalize(result.data||{});
+      const sitterAcknowledged=sitterActiveIntent===null||Boolean(acknowledgedServer.sitter?.active)===sitterActiveIntent;
+      let appliedShared=core.normalize(shared);
+      if(sitterActiveIntent!==null&&!sitterAcknowledged){
+        appliedShared.sitter={...core.normalize({sitter:state.sitter}).sitter,active:sitterActiveIntent};
+      }
+
       const newestLocal=currentShared();
       const changedDuringSync=!core.same(newestLocal,local);
-      syncMeta={version:result.version||0,base:shared,updatedAt:result.updatedAt||null};
+      // The sync base must represent what the server actually acknowledged,
+      // never the optimistic sitter state still waiting to be accepted.
+      syncMeta={version:result.version||0,base:acknowledgedServer,updatedAt:result.updatedAt||null};
       saveSyncMeta();
       if(changedDuringSync){
-        const preserved=core.merge(local,newestLocal,shared);
+        const preserved=core.merge(local,newestLocal,appliedShared);
         if(focusSelectionIntent!==null)preserved.selected=[...focusSelectionIntent];
-        if(sitterActiveIntent!==null)preserved.sitter={...(preserved.sitter||{}),active:sitterActiveIntent};
+        if(sitterActiveIntent!==null)preserved.sitter={...(preserved.sitter||{}),...core.normalize({sitter:state.sitter}).sitter,active:sitterActiveIntent};
         applyShared(preserved);
         syncAgain=true;
         status("Saving a newer care change…","working");
       }else{
-        applyShared(shared);
-        status("Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""),"success");
+        applyShared(appliedShared);
+        status(sitterAcknowledged?"Frannie’s shared record is up to date"+(result.updatedAt?" · "+new Date(result.updatedAt).toLocaleString():""):"Saving sitter activation…",sitterAcknowledged?"success":"working");
       }
       if(focusSelectionIntent!==null){
-        const remoteSelected=core.normalize(result.data||{}).selected||[];
+        const remoteSelected=acknowledgedServer.selected||[];
         if(core.same(remoteSelected,focusSelectionIntent))focusSelectionIntent=null;
         else syncAgain=true;
       }
-      if(sitterActiveIntent!==null && Boolean(core.normalize(result.data||{}).sitter?.active)===sitterActiveIntent){
+      if(sitterActiveIntent!==null&&sitterAcknowledged){
         sitterActiveIntent=null;
-      } else if(sitterActiveIntent!==null){
+      }else if(sitterActiveIntent!==null){
         syncAgain=true;
       }
       if(state.sitter?.active&&splashDismissed())setTimeout(showSitterEntryAlert,60);
