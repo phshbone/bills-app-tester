@@ -465,7 +465,7 @@ initializeUI();
 // Cache the app shell for installed-PWA/offline use.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((error) => {
+    navigator.serviceWorker.register('./sw.js?v=39').catch((error) => {
       console.warn('Service worker registration failed:', error);
     });
   });

@@ -45,10 +45,11 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=35","app.js?v=34","shared-care-core.js?v=17","shared-care.js?v=18"]){
+for(const asset of ["styles.css?v=36","app.js?v=35","shared-care-core.js?v=18","shared-care.js?v=19","frannies-training-update.js?v=3"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v38/,"service worker cache version is v38");
+assert.match(sw,/frannies-good-girl-v39/,"service worker cache version is v39");
+assert.match(app,/serviceWorker\.register\('\.\/sw\.js\?v=39'\)/,"the page requests the v39 service worker instead of reusing the v38 script URL");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the structural toolbar uses the toolbar color");
 assert.match(html,/<div class="app-shell">[\s\S]*<div class="app">[\s\S]*<nav class="bottom-nav"/,"the content scroller and navigation share one structural app shell");
 assert.match(css,/\.app-shell\{[\s\S]*?grid-template-rows:minmax\(0,1fr\) auto;[\s\S]*?overflow:hidden;/,"the app shell owns the viewport and reserves a navigation row");
@@ -74,7 +75,7 @@ for(const asset of ["assets/frannie-background.webp","assets/frannie-photo.webp"
 const training=fs.readFileSync(new URL("frannies-training-update.js",root),"utf8");
 assert.match(training,/Training Video Library/,"official training resource library is restored");
 assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video library preserves iPhone modal compositing repair");
-assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
-assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
+assert.ok(html.includes("frannies-training-update.js?v=3"),"index loads the cache-refreshed training interface");
+assert.ok(sw.includes("frannies-training-update.js?v=3"),"service worker caches the cache-refreshed training interface");
 
-console.log("PASS: 47 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, five-second splash, care UI, iOS app-shell, and PWA regression assertions");
+console.log("PASS: 48 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, five-second splash, coherent v39 cache, care UI, iOS app-shell, and PWA regression assertions");
