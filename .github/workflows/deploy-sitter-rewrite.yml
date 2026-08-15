@@ -37,6 +37,16 @@ jobs:
           cp /tmp/rewrite/styles.css .
           cp /tmp/rewrite/sw.js .
           cp /tmp/rewrite/tests/regression.mjs tests/regression.mjs
+      - name: Verify exact file blobs
+        run: |
+          test "$(git hash-object sitter-mode.js)" = "882ac0f8676e06121da7f5b1dc7efbde84dd5e9b"
+          test "$(git hash-object shared-care-core.js)" = "039a3b135d45bed2387609fad1bf6f32b824b231"
+          test "$(git hash-object shared-care.js)" = "32591695088be2c96a988ecea4dbafcb761b9f09"
+          test "$(git hash-object app.js)" = "4c0f4ac3e6febe3c86d5dfc114e55d5aa436ac61"
+          test "$(git hash-object index.html)" = "f34d7a595375119b9646904f639413216e2f58e5"
+          test "$(git hash-object styles.css)" = "0984dd2eb3968952d36f0c8c311f48172e6fbfd7"
+          test "$(git hash-object sw.js)" = "603b38eb86542cf09010d51d801f1f95ca78423b"
+          test "$(git hash-object tests/regression.mjs)" = "623876e3f94e186d14689b1885ef3ec7d74df6a7"
       - name: Syntax and regression
         run: |
           node --check app.js
@@ -47,10 +57,11 @@ jobs:
       - name: Verify intended scope
         run: |
           git diff --check
-          changed="$(git diff --name-only | sort)"
-          expected="$(printf '%s\n' app.js index.html shared-care-core.js shared-care.js sitter-mode.js styles.css sw.js tests/regression.mjs | sort)"
-          printf 'Changed files:\n%s\n' "$changed"
-          test "$changed" = "$expected"
+          tracked="$(git diff --name-only | sort)"
+          expected_tracked="$(printf '%s\n' app.js index.html shared-care-core.js shared-care.js styles.css sw.js tests/regression.mjs | sort)"
+          untracked="$(git ls-files --others --exclude-standard | sort)"
+          test "$tracked" = "$expected_tracked"
+          test "$untracked" = "sitter-mode.js"
       - name: Commit exact rewrite
         run: |
           git config user.name "BTR Rewrite"
