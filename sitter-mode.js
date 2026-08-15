@@ -2,6 +2,7 @@
   "use strict";
 
   const PENDING_KEY="frannieSitterPendingV2";
+  const PRE_RELEASE_RESET_CUTOFF=Date.parse("2026-08-15T14:40:00.000Z");
   const TEXT_FIELDS=["pottyRoutine","crateSleep","emergencyVet","instructions","activatedAt","activatedBy","activatedByDeviceId","sessionId","changedAt","changedBy","changeId","endedAt","endedBy"];
 
   function text(value){return typeof value==="string"?value:""}
@@ -78,6 +79,16 @@
         if(open)openView("care");
       }
       return saved;
+    }
+
+    function resetPreReleaseSession(){
+      const current=getSitter();
+      if(!current.active)return false;
+      const activatedAt=Date.parse(current.activatedAt||"")||0;
+      if(activatedAt>=PRE_RELEASE_RESET_CUTOFF)return false;
+      const actor=getUser()||"System";
+      const next={...current,active:false,endedAt:new Date().toISOString(),endedBy:actor};
+      return setAndPersist(next,"Reset pre-release sitter test session");
     }
 
     function restorePendingIntoLocal(){
@@ -329,6 +340,7 @@
 
     buildScreen();
     restorePendingIntoLocal();
+    resetPreReleaseSession();
 
     return {
       normalize,

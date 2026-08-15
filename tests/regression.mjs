@@ -82,11 +82,11 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons retain a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=37","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=1","shared-care.js?v=20"]){
+for(const asset of ["styles.css?v=37","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=2","shared-care.js?v=20"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
 assert.match(sw,/frannie-pr7-stable-/,"service worker cache remains isolated to this app");
-assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v3`/,"structural shell repair advances the isolated cache generation");
+assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v4`/,"structural shell repair advances the isolated cache generation");
 assert.match(sw,/keys\.filter\(k=>k\.startsWith\(CACHE_PREFIX\)&&k!==CACHE_NAME\)/,"cache cleanup cannot delete another app's caches");
 assert.match(sw,/sitter-mode\.js/,"service worker treats the sitter module as an app-shell/core asset");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the toolbar uses the toolbar color");
@@ -123,4 +123,8 @@ assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video l
 assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
+assert.match(sitterSource,/PRE_RELEASE_RESET_CUTOFF=Date\.parse\("2026-08-15T14:40:00\.000Z"\)/,"Pass 1 has a fixed pre-release sitter reset cutoff");
+assert.match(sitterSource,/function resetPreReleaseSession\(\)/,"Pass 1 defines a pre-release session reset path");
+assert.match(sitterSource,/if\(activatedAt>=PRE_RELEASE_RESET_CUTOFF\)return false;/,"post-cutoff sitter sessions are never auto-ended");
+assert.match(sitterSource,/Reset pre-release sitter test session/,"the reset is explicitly logged");
 console.log("PASS: Frannie sitter rewrite + structural app-shell navigation regression assertions");
