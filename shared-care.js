@@ -621,7 +621,9 @@
     jumpNav.addEventListener("click",event=>{
       const button=event.target.closest("[data-care-jump]");
       if(!button)return;
-      document.getElementById(button.dataset.careJump)?.scrollIntoView({behavior:"smooth",block:"start"});
+      const sitterJump=button.dataset.careJump==="sitterEditor";
+      const targetId=sitterJump?"sitterControlsAnchor":button.dataset.careJump;
+      document.getElementById(targetId)?.scrollIntoView({behavior:"smooth",block:sitterJump?"center":"start"});
     });
 
     const scroller=document.querySelector(".app-body");
@@ -646,7 +648,7 @@
 
     const editor=document.createElement("div");
     editor.className="care-section full";editor.id="sitterEditor";
-    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>Sitter Mode is a live care sheet. The person who activates a session owns it until that same person ends it. The owner can update these instructions at any time while the session stays active.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions"><button class="secondary" id="saveSitterInstructions" type="button">Save draft</button><button class="primary" id="activateSitterInstructions" type="button">Activate Sitter Mode</button><button class="secondary hidden" id="endSitterInstructions" type="button">End Sitter Mode</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instruction draft saved.</div>`;
+    editor.innerHTML=`<h3>Frannie’s Sitter</h3><p>Sitter Mode is a live care sheet. The person who activates a session owns it until that same person ends it. The owner can update these instructions at any time while the session stays active.</p><div class="row-2"><div><label>Potty / outside routine</label><textarea id="sitterPotty" placeholder="When to go out, door or yard routine"></textarea></div><div><label>Crate / sleep instructions</label><textarea id="sitterCrate" placeholder="Crate, bedtime, settling, and sleep routine"></textarea></div></div><div class="row-2" style="margin-top:9px"><div><label>Emergency / vet information</label><textarea id="sitterEmergency" placeholder="Vet, emergency contact, clinic, phone"></textarea></div><div><label>Sitter-specific instructions</label><textarea id="sitterInstructions" placeholder="Anything this caretaker should know"></textarea></div></div><div class="actions" id="sitterControlsAnchor"><button class="secondary" id="saveSitterInstructions" type="button">Save draft</button><button class="primary" id="activateSitterInstructions" type="button">Activate Sitter Mode</button><button class="secondary hidden" id="endSitterInstructions" type="button">End Sitter Mode</button><button class="secondary" id="openSitterView" type="button">Open caretaker view</button></div><div id="sitterSaved" class="save-confirm hidden">✓ Sitter instruction draft saved.</div>`;
     const timeline=Array.from(careGrid.children).find(item=>item.querySelector("h3")?.textContent.includes("Frannie timeline"));
     careGrid.insertBefore(editor,timeline||null);
 
