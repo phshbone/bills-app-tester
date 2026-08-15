@@ -3,7 +3,7 @@
 ## PROVEN
 
 - JavaScript syntax passes for `app.js`, `shared-care-core.js`, `shared-care.js`, `frannies-training-update.js`, `sw.js`, and `worker/src/worker.js`.
-- 48 executable state/structure assertions pass: sitter merge persistence, owner/session fields, multiple current medications/foods, append-only audit union, all-current sitter filters, session-only checklist, secure invite and recovery URLs, compact connection controls, explicit medication status, separated treatment actions, official imagery/icons/manifest, restored training library, the five-second opening splash, the structural iOS app shell, iPhone modal cleanup, and a coherent v39 PWA cache generation.
+- 46 executable state/structure assertions pass: sitter merge persistence, owner/session fields, multiple current medications/foods, append-only audit union, all-current sitter filters, session-only checklist, secure invite and recovery URLs, compact connection controls, explicit medication status, separated treatment actions, official imagery/icons/manifest, restored training library, the structural iOS app shell, iPhone modal cleanup, and complete PWA asset/cache alignment.
 - 24 simulated Worker assertions pass: live health compatibility, valid invite, reusable and replaceable recovery links, same-name device retirement, sitter ownership handoff, complete shared-state persistence, stale-version conflict, revocation, and administrative recovery.
 - No permanent family or device credential is included in source, HTML, or the invite URL implementation.
 
@@ -20,7 +20,7 @@ Command: `npm test`
 
 - `setNextActivity -> onLocalPersist -> addActivity -> Store.save -> extract -> merge -> applyShared -> renderActivityLog` remains connected.
 - Active sitter editing and ending require the owner device; viewing does not.
-- Cache `v39` and query versions (`app 35`, styles 36, shared core 18, shared UI 19, training interface 3) agree; the service-worker script URL is also versioned as v39.
+- Cache `v38` and query versions (`app 33`, styles 35, shared core 17, shared UI 18, training interface 2) agree.
 - Old caches are deleted; core files use network-first with cached fallback.
 - Pairing tokens are temporary; device credentials stay in local storage and D1 stores only hashes.
 - No Cloudflare deployment, live D1 mutation, Worker setting change, or secret creation was performed.
@@ -36,4 +36,4 @@ Command: `npm test`
 
 ## Result
 
-Automated/simulated checks: **72 passed** (48 frontend and 24 Worker). Syntax checks: **6 passed**. A phone-sized local browser check also confirmed the restored splash artwork, Training Video Library, Care screen, and absence of browser warnings/errors. Real-device checks remain mandatory and are not claimed as passed.
+Automated/simulated checks: **70 passed** (46 frontend and 24 Worker). Syntax checks: **6 passed**. A phone-sized local browser check also confirmed the restored splash artwork, Training Video Library, Care screen, and absence of browser warnings/errors. Real-device checks remain mandatory and are not claimed as passed.
