@@ -7,54 +7,14 @@ on:
     paths:
       - .github/workflows/deploy-sitter-rewrite.yml
 
-permissions:
-  contents: write
-
 jobs:
-  apply-test-commit:
+  diagnose-sizes:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: deploy-sitter-rewrite-20260815
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Reassemble exact checkpoint payload
+      - name: Report exact chunk sizes
         run: |
-          cat .rewrite-payload/chunk_00 .rewrite-payload/chunk_01_02 .rewrite-payload/chunk_03_04 .rewrite-payload/chunk_05 .rewrite-payload/chunk_06 .rewrite-payload/chunk_07_08 .rewrite-payload/chunk_09_10 > /tmp/payload.b64
-          test "$(wc -c < /tmp/payload.b64)" -eq 65436
-          base64 -d /tmp/payload.b64 > /tmp/sitter-rewrite.tgz
-          echo "f51bf552f07f57cca23bc1f447cc49f8c2be765f9ef69d19820ef57bdf73bc17  /tmp/sitter-rewrite.tgz" | sha256sum -c -
-          mkdir -p /tmp/rewrite
-          tar -xzf /tmp/sitter-rewrite.tgz -C /tmp/rewrite
-          cp /tmp/rewrite/sitter-mode.js .
-          cp /tmp/rewrite/shared-care-core.js .
-          cp /tmp/rewrite/shared-care.js .
-          cp /tmp/rewrite/app.js .
-          cp /tmp/rewrite/index.html .
-          cp /tmp/rewrite/styles.css .
-          cp /tmp/rewrite/sw.js .
-          cp /tmp/rewrite/tests/regression.mjs tests/regression.mjs
-      - name: Syntax and regression
-        run: |
-          node --check app.js
-          node --check shared-care-core.js
-          node --check sitter-mode.js
-          node --check shared-care.js
-          npm test
-      - name: Verify intended scope
-        run: |
-          git diff --check
-          changed="$(git diff --name-only | sort)"
-          expected="$(printf '%s\n' app.js index.html shared-care-core.js shared-care.js sitter-mode.js styles.css sw.js tests/regression.mjs | sort)"
-          printf 'Changed files:\n%s\n' "$changed"
-          test "$changed" = "$expected"
-      - name: Commit exact rewrite
-        run: |
-          git config user.name "BTR Rewrite"
-          git config user.email "actions@users.noreply.github.com"
-          git add app.js index.html shared-care-core.js shared-care.js sitter-mode.js styles.css sw.js tests/regression.mjs
-          git commit -m "Sitter Mode rewrite v1"
-          git push origin HEAD:deploy-sitter-rewrite-20260815
+          wc -c .rewrite-payload/chunk_00 .rewrite-payload/chunk_01_02 .rewrite-payload/chunk_03_04 .rewrite-payload/chunk_05 .rewrite-payload/chunk_06 .rewrite-payload/chunk_07_08 .rewrite-payload/chunk_09_10
+          sha256sum .rewrite-payload/chunk_05 .rewrite-payload/chunk_06
