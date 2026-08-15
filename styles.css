@@ -476,3 +476,17 @@ html.install-required .install-curtain{
 .sitter-entry-card #continueToSitterInstructions{background:#9e2f44!important;border-color:#9e2f44!important;color:#fff!important;font-size:.98rem}
 .sitter-entry-dismiss{background:#fff8f5!important;color:#704753!important}
 @media(max-width:420px){.sitter-entry-card{padding:21px 16px 17px}.sitter-entry-card h2{font-size:1.45rem}}
+/* Header accordion — presentation only; shell geometry remains structural. */
+.hero{overflow:hidden;transition:padding .22s ease,border-radius .22s ease}
+.hero h1{transition:font-size .22s ease,line-height .22s ease,margin .22s ease}
+.hero .status{transition:margin .22s ease,padding .22s ease,font-size .22s ease}
+.hero-collapsible{overflow:hidden;opacity:1;max-height:120px;transition:max-height .22s ease,opacity .16s ease,margin .22s ease}
+.hero-eyebrow-wrap{max-height:24px}
+.hero-copy-wrap{max-height:120px}
+.hero.hero-compact{padding:12px 16px;border-radius:20px}
+.hero.hero-compact .hero-collapsible{max-height:0;opacity:0;margin:0}
+.hero.hero-compact h1{font-size:clamp(1.55rem,6vw,2rem);line-height:.96;margin:0}
+.hero.hero-compact .status{margin-top:7px;padding:5px 8px;font-size:.7rem}
+@media(prefers-reduced-motion:reduce){
+  .hero,.hero h1,.hero .status,.hero-collapsible{transition:none}
+}
