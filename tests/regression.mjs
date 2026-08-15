@@ -27,6 +27,11 @@ assert.equal(core.mergeActivityLog([...audit,audit[0]],audit).length,2,"audit ID
 
 const shared=fs.readFileSync(new URL("shared-care.js",root),"utf8");
 assert.match(shared,/sitterNeedsWrite[\s\S]*saveRemote\(shared,result\.version\|\|0\)/,"unacknowledged sitter intent is pushed before becoming the sync base");
+assert.match(shared,/SITTER_INTENT_KEY="frannieCareSitterIntentV1"/,"pending sitter intent has durable local storage");
+assert.match(shared,/let sitterActiveIntent=loadSitterIntent\(\)/,"pending sitter intent is restored after a PWA restart");
+assert.match(shared,/setSitterIntent\(false\)/,"ending sitter mode records a durable false intent");
+assert.match(shared,/clearSitterIntent\(\)[\s\S]*sitterAcknowledged/,"pending sitter intent is cleared only after matching server acknowledgement");
+assert.match(shared,/thisDeviceIds\.includes\(ownerDevice\)\|\|sameNamedOwner/,"the same named owner can reclaim a sitter session after device-id rotation");
 assert.match(shared,/activatedByDeviceId:deviceInfo\?\.id\|\|localDeviceId/,"activation binds ownership to the device");
 assert.match(shared,/currentMedication=.*filter\(item=>item\.type==="Medication"&&item\.active===true\)/,"sitter filters every explicit current medication");
 assert.match(shared,/currentFood=.*filter\(item=>item\.active===true\)/,"sitter filters every explicit current feeding item");
@@ -45,10 +50,10 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons have a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=34","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=18"]){
+for(const asset of ["styles.css?v=34","app.js?v=33","shared-care-core.js?v=17","shared-care.js?v=20"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
-assert.match(sw,/frannies-good-girl-v38/,"service worker cache version is v38");
+assert.match(sw,/frannies-good-girl-v40/,"service worker cache version is v38");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the fixed toolbar uses the toolbar color");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
@@ -72,4 +77,4 @@ assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video l
 assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
-console.log("PASS: 42 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, care UI, and PWA regression assertions");
+console.log("PASS: 47 Frannie state, sync, pairing, recovery, audit, complete assets, training UI, care UI, and PWA regression assertions");
