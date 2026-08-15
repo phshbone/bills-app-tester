@@ -29,7 +29,7 @@ p.write_text(s)
 p=root/'tests/regression.mjs'
 s=p.read_text()
 s=s.replace('"shared-care.js?v=20"','"shared-care.js?v=21"').replace('CACHE_PREFIX\\}v6','CACHE_PREFIX\\}v7')
-addition='''\nassert.match(sharedCare,/const sitterJump=button\\.dataset\\.careJump===\"sitterEditor\"/,"Sitter care pill has its own landing behavior");\nassert.match(sharedCare,/targetId=sitterJump\\?\"sitterControlsAnchor\":button\\.dataset\\.careJump/,"Sitter pill targets the existing control row");\nassert.match(sharedCare,/block:sitterJump\\?\"center\":\"start\"/,"Sitter controls are centered while other care pills still align sections to the top");\nassert.match(sharedCare,/id=\"sitterControlsAnchor\"/,"Sitter actions expose a dedicated jump anchor");'''
+addition='''\nassert.match(shared,/const sitterJump=button\\.dataset\\.careJump===\"sitterEditor\"/,"Sitter care pill has its own landing behavior");\nassert.match(shared,/targetId=sitterJump\\?\"sitterControlsAnchor\":button\\.dataset\\.careJump/,"Sitter pill targets the existing control row");\nassert.match(shared,/block:sitterJump\\?\"center\":\"start\"/,"Sitter controls are centered while other care pills still align sections to the top");\nassert.match(shared,/id=\"sitterControlsAnchor\"/,"Sitter actions expose a dedicated jump anchor");'''
 if 'Sitter care pill has its own landing behavior' not in s:
     s=s.rstrip()+addition+'\n'
 p.write_text(s)
