@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - btr-sitter-activation-20260815
+    paths:
+      - .github/workflows/btr-sitter-activation.yml
 
 permissions:
   contents: write
 
 jobs:
   repair-and-test:
-    if: github.event.head_commit.message != 'BTR: preserve sitter activation until server acknowledgement [skip ci]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,5 +105,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add shared-care.js
           git diff --cached --check
-          git commit -m "BTR: preserve sitter activation until server acknowledgement [skip ci]"
+          git commit -m "BTR: preserve sitter activation until server acknowledgement"
           git push origin HEAD:btr-sitter-activation-20260815
