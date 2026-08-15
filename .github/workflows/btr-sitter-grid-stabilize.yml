@@ -40,3 +40,4 @@ jobs:
           git add index.html styles.css sw.js tests/regression.mjs
           git commit -m "Stabilize sitter editor field grid"
           git push origin HEAD:btr-sitter-grid-stabilize-20260815
+# rerun after EOF normalization
