@@ -82,21 +82,25 @@ const css=fs.readFileSync(new URL("styles.css",root),"utf8");
 assert.match(app,/x\.type==="Medication"\)return x\.active===true\?\["Ongoing"[\s\S]*\["Ended"/,"medication status follows the explicit Current switch");
 assert.match(app,/class="entry-actions"/,"treatment edit and remove buttons retain a dedicated action row");
 assert.match(app,/currentMedications=items\.filter[\s\S]*visible=\[\.\.\.currentMedications,\.\.\.otherTreatments\.slice\(0,1\)\]/,"all current medications remain visible above collapsed treatment history");
-for(const asset of ["styles.css?v=36","app.js?v=33","shared-care-core.js?v=18","sitter-mode.js?v=1","shared-care.js?v=19"]){
+for(const asset of ["styles.css?v=37","app.js?v=34","shared-care-core.js?v=18","sitter-mode.js?v=1","shared-care.js?v=20"]){
   assert.ok(html.includes(asset),`index references ${asset}`);assert.ok(sw.includes(asset),`service worker caches ${asset}`);
 }
 assert.match(sw,/frannie-pr7-stable-/,"service worker cache remains isolated to this app");
-assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v2`/,"sitter rewrite advances the isolated cache generation");
+assert.match(sw,/CACHE_NAME = `\$\{CACHE_PREFIX\}v3`/,"structural shell repair advances the isolated cache generation");
 assert.match(sw,/keys\.filter\(k=>k\.startsWith\(CACHE_PREFIX\)&&k!==CACHE_NAME\)/,"cache cleanup cannot delete another app's caches");
 assert.match(sw,/sitter-mode\.js/,"service worker treats the sitter module as an app-shell/core asset");
 assert.match(css,/html\{background:#1b1719\}/,"the iPhone area below the toolbar uses the toolbar color");
-assert.match(css,/body\{[\s\S]*?position:fixed;[\s\S]*?inset:0;/,"the known baseline body remains the viewport owner");
-assert.match(css,/\.app\{[\s\S]*?position:fixed !important;[\s\S]*?overflow-y:auto;/,"the known baseline content region remains the app scroller");
-assert.match(css,/\.bottom-nav\{[\s\S]*?position:absolute !important;/,"navigation remains anchored to the fixed viewport body");
+assert.match(html,/class="app-body" id="appBody"/,"the app has one dedicated middle scrolling region");
+assert.match(css,/\.app\{[\s\S]*?height:100dvh;[\s\S]*?display:flex;[\s\S]*?flex-direction:column;[\s\S]*?overflow:hidden !important;/,"the app shell owns the full viewport as a structural flex column");
+assert.match(css,/\.app-body\{[\s\S]*?flex:1 1 auto;[\s\S]*?min-height:0;[\s\S]*?overflow-y:auto;/,"only the center app body scrolls");
+assert.match(css,/\.bottom-nav\{[\s\S]*?position:relative !important;[\s\S]*?flex:0 0 auto;/,"bottom navigation is structural rather than floating over content");
 assert.doesNotMatch(css,/\.bottom-nav\{[^}]*position:fixed/,"navigation never uses iOS position fixed");
+assert.match(css,/body\{\s*position:static !important;/,"body no longer owns a fixed iOS compositor layer");
+assert.match(app,/document\.querySelector\("\.app-body"\)/,"screen navigation resets the single body scroller");
+assert.doesNotMatch(app,/requestAnimationFrame\(\(\)=>\{scroller\.scrollTop=0\}\)/,"navigation no longer performs a second competing scroll reset");
+assert.match(shared,/document\.querySelector\("\.app-body"\)/,"shared-care jump navigation uses the same single body scroller");
 assert.match(css,/Sitter Mode rewrite v1/,"rewritten sitter screen has isolated styles");
 assert.doesNotMatch(css,/\.sitter-page-actions\{position:sticky/,"sitter controls do not add another sticky/fixed compositor layer");
-assert.doesNotMatch(html,/class="app-shell"/,"the later structural app-shell rewrite is not present");
 assert.match(app,/setTimeout\(dismissSplash,3000\)/,"the baseline splash timing is untouched");
 
 const worker=fs.readFileSync(new URL("worker/src/worker.js",root),"utf8");
@@ -119,4 +123,4 @@ assert.doesNotMatch(training,/document\.body\.style\.overflow/,"training video l
 assert.ok(html.includes("frannies-training-update.js?v=2"),"index loads restored training interface v2");
 assert.ok(sw.includes("frannies-training-update.js?v=2"),"service worker caches restored training interface v2");
 
-console.log("PASS: 67 Frannie baseline, sitter rewrite, ownership, durable sync, audit, cache, navigation, assets, training, care, and Worker regression assertions");
+console.log("PASS: Frannie sitter rewrite + structural app-shell navigation regression assertions");

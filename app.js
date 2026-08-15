@@ -155,8 +155,8 @@ function showScreen(id,btn){
   // Clear the pressed/focused button after navigation. iOS can otherwise
   // leave a fixed compositing layer looking dim until the next touch.
   document.activeElement?.blur?.();
-  const scroller=document.querySelector(".app");
-  if(scroller){scroller.scrollTop=0;requestAnimationFrame(()=>{scroller.scrollTop=0})}
+  const scroller=document.querySelector(".app-body");
+  if(scroller)scroller.scrollTop=0;
 }
 function renderTimer(){$("timer").textContent=String(Math.floor(seconds/60)).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0")}
 function startTimer(){if(ticker)return;ticker=setInterval(()=>{if(seconds>0){seconds--;renderTimer()}else{pauseTimer();alert("Session complete. Finish with an easy success if possible.")}},1000)}

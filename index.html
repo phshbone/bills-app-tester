@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Frannie’s a Good Girl">
 <title>frannie</title>
-<link rel="stylesheet" href="styles.css?v=36">
+<link rel="stylesheet" href="styles.css?v=37">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <script>
@@ -58,6 +58,7 @@
 <div class="status" id="heroStatus">Day 1: good girl status pending</div>
 </header>
 
+<div class="app-body" id="appBody">
 <main>
 <section id="home" class="screen active">
 <div class="grid two">
@@ -212,6 +213,7 @@
 <button class="nav" onclick="showScreen('plan',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Plan</span></button>
 <button class="nav" onclick="showScreen('log',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Frannie Log</span></button>
 <button class="nav" onclick="showScreen('safety',this)"><svg viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="16" cy="26" rx="6" ry="8"/><ellipse cx="28" cy="18" rx="6" ry="8"/><ellipse cx="40" cy="18" rx="6" ry="8"/><ellipse cx="50" cy="28" rx="6" ry="8"/></g></svg><span>Safety</span></button></nav>
+</div>
 
 <div class="modal" id="videoModal" onclick="modalBackdrop(event)">
 <div class="modal-box">
@@ -220,10 +222,10 @@
 <div class="modal-fallback">The video is streamed from YouTube. If the uploader blocks embedded playback, <a id="youtubeFallback" target="_blank" rel="noopener">open the official video on YouTube</a>.</div>
 </div></div>
 
-<script src="app.js?v=33" defer></script>
+<script src="app.js?v=34" defer></script>
 <script src="shared-care-core.js?v=18" defer></script>
 <script src="sitter-mode.js?v=1" defer></script>
-<script src="shared-care.js?v=19" defer></script>
+<script src="shared-care.js?v=20" defer></script>
 <script src="frannies-training-update.js?v=2" defer></script>
 <section id="printReport" class="print-only"></section></body>
 </html>
