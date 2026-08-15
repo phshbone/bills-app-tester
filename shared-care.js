@@ -624,7 +624,7 @@
       document.getElementById(button.dataset.careJump)?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
-    const scroller=document.querySelector(".app");
+    const scroller=document.querySelector(".app-body");
     const topButton=document.createElement("button");
     topButton.type="button";
     topButton.id="careTopButton";
