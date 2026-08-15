@@ -24,7 +24,7 @@ jobs:
       - name: Reassemble exact checkpoint payload
         run: |
           cat .rewrite-payload/chunk_* > /tmp/payload.b64
-          base64 -d /tmp/payload.b64 > /tmp/sitter-rewrite.tgz
+          base64 -d --ignore-garbage /tmp/payload.b64 > /tmp/sitter-rewrite.tgz
           echo "f51bf552f07f57cca23bc1f447cc49f8c2be765f9ef69d19820ef57bdf73bc17  /tmp/sitter-rewrite.tgz" | sha256sum -c -
           mkdir -p /tmp/rewrite
           tar -xzf /tmp/sitter-rewrite.tgz -C /tmp/rewrite
