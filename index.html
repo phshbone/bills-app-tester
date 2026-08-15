@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Frannie’s a Good Girl">
 <title>frannie</title>
-<link rel="stylesheet" href="styles.css?v=38">
+<link rel="stylesheet" href="styles.css?v=39">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <script>
@@ -51,10 +51,10 @@
 </div>
 
 <div class="app">
-<header class="hero">
-<div class="eyebrow">A private step-by-step training guide</div>
+<header class="hero" id="appHero">
+<div class="hero-collapsible hero-eyebrow-wrap"><div class="eyebrow">A private step-by-step training guide</div></div>
 <h1>Frannie’s<br>a Good Girl</h1>
-<p>Clear practice sessions for Frannie and Frannie’s human, Mollie. Written lessons work on their own; official Cesar Millan videos are optional visual companions.</p>
+<div class="hero-collapsible hero-copy-wrap"><p>Clear practice sessions for Frannie and Frannie’s human, Mollie. Written lessons work on their own; official Cesar Millan videos are optional visual companions.</p></div>
 <div class="status" id="heroStatus">Day 1: good girl status pending</div>
 </header>
 
@@ -227,5 +227,23 @@
 <script src="sitter-mode.js?v=3" defer></script>
 <script src="shared-care.js?v=20" defer></script>
 <script src="frannies-training-update.js?v=2" defer></script>
-<section id="printReport" class="print-only"></section></body>
+<section id="printReport" class="print-only"></section><script>
+(function(){
+  const body=document.getElementById("appBody");
+  const hero=document.getElementById("appHero");
+  if(!body||!hero)return;
+  let compact=false;
+  function setCompact(next){
+    if(next===compact)return;
+    compact=next;
+    hero.classList.toggle("hero-compact",compact);
+  }
+  body.addEventListener("scroll",function(){
+    const y=body.scrollTop;
+    if(!compact&&y>42)setCompact(true);
+    else if(compact&&y<6)setCompact(false);
+  },{passive:true});
+})();
+</script>
+</body>
 </html>
