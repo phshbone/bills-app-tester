@@ -7,6 +7,7 @@
   const LOCAL_DEVICE_KEY="frannieCareLocalDeviceIdV1";
   const INVITE_KEY="franniePendingInviteV1";
   const SYNC_KEY="frannieCareSyncV1";
+  const SITTER_INTENT_KEY="frannieCareSitterIntentV1";
   const USER_KEY="frannieCareUserNameV1";
   const MAX_ACTIVITY=100;
   const BUILD_ID="CODEX-v3.3 · cache v38";
@@ -63,12 +64,27 @@
   let suppressSync=false;
   let lastCareSnapshot=null;
   let sitterDismissedThisForeground=false;
-  let sitterActiveIntent=null;
+  let sitterActiveIntent=loadSitterIntent();
   let focusSelectionIntent=null;
   const sitterChecklistChecks=new Set();
 
   function sitterChecklistKey(sectionTitle,index,item){
     return `${sectionTitle}::${index}::${String(item||"")}`;
+  }
+
+  function loadSitterIntent(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(SITTER_INTENT_KEY)||"null");
+      return saved&&typeof saved.active==="boolean"?saved.active:null;
+    }catch{return null}
+  }
+  function setSitterIntent(active){
+    sitterActiveIntent=Boolean(active);
+    localStorage.setItem(SITTER_INTENT_KEY,JSON.stringify({active:sitterActiveIntent,at:new Date().toISOString()}));
+  }
+  function clearSitterIntent(){
+    sitterActiveIntent=null;
+    localStorage.removeItem(SITTER_INTENT_KEY);
   }
 
   const TRACKED_ARRAYS={
@@ -88,12 +104,14 @@
   function canEndSitter(){
     if(!state.sitter?.active)return false;
     const ownerDevice=(state.sitter?.activatedByDeviceId||"").trim();
-    const thisDeviceIds=[deviceInfo?.id,localDeviceId].map(value=>String(value||"").trim()).filter(Boolean);
-    if(ownerDevice)return thisDeviceIds.includes(ownerDevice);
-    // Legacy active sessions did not have a device owner. Retain the old name
-    // check only for those sessions so an upgrade cannot permanently lock one.
     const owner=(state.sitter?.activatedBy||"").trim();
-    return !owner||sameActor(owner,userName);
+    const thisDeviceIds=[deviceInfo?.id,localDeviceId].map(value=>String(value||"").trim()).filter(Boolean);
+    const sameNamedOwner=Boolean(owner&&userName&&sameActor(owner,userName));
+    // Prefer exact device ownership, but do not permanently strand a sitter
+    // session after a reinstall, recovery pairing, or local device-id change.
+    // The same named family member may reclaim and end their active session.
+    if(ownerDevice)return thisDeviceIds.includes(ownerDevice)||sameNamedOwner;
+    return !owner||sameNamedOwner;
   }
 
   function careSnapshot(data=currentShared()){
@@ -295,6 +313,9 @@
       state.profile=shared.profile?{...shared.profile}:null;
       core.ARRAY_FIELDS.forEach(field=>{state[field]=shared[field]});
       state.sitter=shared.sitter;
+      if(sitterActiveIntent!==null){
+        state.sitter={...(state.sitter||{}),active:sitterActiveIntent};
+      }
       Store.save(state);
       initializeUI();
       fillSitterEditor();
@@ -442,7 +463,7 @@
         else syncAgain=true;
       }
       if(sitterActiveIntent!==null&&sitterAcknowledged){
-        sitterActiveIntent=null;
+        clearSitterIntent();
       }else if(sitterActiveIntent!==null){
         syncAgain=true;
       }
@@ -608,7 +629,7 @@
     const draft=readSitterEditor();
     if(!Object.values(draft).some(Boolean)){alert("Add sitter instructions before activating them.");return}
     state.sitter={...draft,active:true,activatedAt:new Date().toISOString(),activatedBy:userName||"Unknown device",activatedByDeviceId:deviceInfo?.id||localDeviceId,sessionId:(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2))};
-    sitterActiveIntent=true;
+    setSitterIntent(true);
     sitterDismissedThisForeground=false;
     if(persist()){
       fillSitterEditor();renderSitterView();renderSitterBanner();
@@ -625,7 +646,7 @@
     }
     if(!confirm("End the active sitter instructions? The saved directions will remain available as a draft."))return;
     state.sitter={...state.sitter,active:false};
-    sitterActiveIntent=false;
+    setSitterIntent(false);
     document.getElementById("sitterEntryAlert")?.classList.remove("open");
     if(persist()){
       renderSitterBanner();renderSitterView();
