@@ -27,7 +27,7 @@ p=root/'sw.js'; s=p.read_text().replace('`${CACHE_PREFIX}v5`','`${CACHE_PREFIX}v
 # Regression assertions.
 p=root/'tests/regression.mjs'; s=p.read_text()
 s=s.replace('"styles.css?v=38"','"styles.css?v=39"').replace('"app.js?v=34"','"app.js?v=35"').replace('CACHE_PREFIX\\}v5','CACHE_PREFIX\\}v6')
-addition='''\nassert.match(app,/classList\\.toggle\\(\"header-compact\",id!==\"home\"\\)/,"header mode follows screen selection only");\nassert.match(css,/\\.hero\\.header-compact p\\{display:none\\}/,"non-Home screens hide only hero description");\nassert.doesNotMatch(app,/hero.*scroll|scroll.*hero/i,"header behavior does not depend on scrolling");\n'''
+addition='''assert.match(app,/classList\\.toggle\\(\"header-compact\",id!==\"home\"\\)/,"header mode follows screen selection only");\nassert.match(css,/\\.hero\\.header-compact p\\{display:none\\}/,"non-Home screens hide only hero description");\nassert.doesNotMatch(app,/hero.*scroll|scroll.*hero/i,"header behavior does not depend on scrolling");'''
 if 'header mode follows screen selection only' not in s:
-    s = s.rstrip()+addition+'\n'
+    s = s.rstrip()+'\n'+addition+'\n'
 p.write_text(s)
