@@ -58,7 +58,7 @@ textarea{min-height:90px;resize:vertical}
 .rating{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .rating button{border:1px solid var(--line);background:#fffaf7;border-radius:12px;padding:11px;font-weight:850}
 .rating button.active{background:#efdce2;border-color:var(--pink3)}
-.bottom-nav{position:fixed;z-index:10;left:50%;bottom:11px;transform:translateX(-50%);width:min(94%,620px);display:grid;grid-template-columns:repeat(4,1fr);padding:7px;background:rgba(27,23,25,.96);border-radius:18px;box-shadow:var(--shadow)}
+.bottom-nav{position:sticky;z-index:10;bottom:0;width:100%;display:grid;grid-template-columns:repeat(4,1fr);padding:7px;background:rgba(27,23,25,.96);border-radius:18px 18px 0 0;box-shadow:var(--shadow)}
 .nav{border:0;background:transparent;color:#e8dfe2;padding:9px 3px;border-radius:12px;font-size:.71rem;font-weight:900} .nav.active{background:var(--pink2);color:#2b2023}
 .modal{position:fixed;z-index:100;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:16px}
 .modal.open{display:flex} .modal-box{width:min(100%,900px);background:#191719;border-radius:18px;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.6)}
@@ -147,8 +147,8 @@ textarea{min-height:90px;resize:vertical}
 
 .save-confirm{margin-top:10px;padding:10px 12px;border-radius:12px;background:#e3ece5;color:#3f5d48;border:1px solid #bfd1c3;font-weight:900}
 html,body{overscroll-behavior-y:none}
-.app{padding-bottom:118px}
-.bottom-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;border-radius:18px 18px 0 0!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;min-height:82px;margin:0!important}
+.app{padding-bottom:24px}
+.bottom-nav{width:100%!important;max-width:none!important;border-radius:18px 18px 0 0!important;padding:8px 8px calc(8px + env(safe-area-inset-bottom))!important;min-height:82px;margin:0!important}
 .quick-log-entry{margin-top:15px;padding:14px;border:1px solid var(--line);background:#fffaf7;border-radius:16px}
 .print-only{display:none}
 @page{margin:.35in}
@@ -174,7 +174,7 @@ html,body{overscroll-behavior-y:none}
   html[data-print-mode="letter"] .print-only p{font-size:11px}
 }
 
-/* Stable iPhone bottom navigation */
+/* iOS app shell: one viewport owner, one content scroller, structural navigation. */
 html,body{
   width:100%;
   height:100%;
@@ -183,32 +183,34 @@ html,body{
 }
 html{background:#1b1719}
 body{
-  position:fixed;
-  inset:0;
+  position:relative;
+}
+.app-shell{
+  width:100%;
+  height:100dvh;
+  min-height:0;
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  overflow:hidden;
 }
 .app{
-  position:fixed !important;
-  inset:0 0 0 0;
+  position:relative !important;
   width:100%;
   max-width:none;
-  height:100dvh;
-  min-height:100dvh;
+  height:auto;
+  min-height:0;
   overflow-y:auto;
   overflow-x:hidden;
-  -webkit-overflow-scrolling:auto;
+  -webkit-overflow-scrolling:touch;
   overscroll-behavior:none;
   scroll-behavior:auto;
-  padding:calc(20px + env(safe-area-inset-top)) 14px calc(110px + env(safe-area-inset-bottom)) !important;
+  padding:calc(20px + env(safe-area-inset-top)) 14px 24px !important;
   margin:0;
 }
 .bottom-nav{
-  position:fixed !important;
+  position:sticky !important;
   z-index:9999 !important;
-  left:0 !important;
-  right:0 !important;
   bottom:0 !important;
-  top:auto !important;
-  transform:none !important;
   width:100% !important;
   height:auto !important;
   min-height:82px !important;
@@ -216,15 +218,14 @@ body{
   margin:0 !important;
   border-radius:18px 18px 0 0 !important;
   padding:8px 8px calc(8px + env(safe-area-inset-bottom)) !important;
-  will-change:auto !important;
-  contain:layout paint;
+  align-self:end;
 }
 .splash,.modal{
   position:fixed !important;
   inset:0 !important;
 }
 @supports not (height:100dvh){
-  .app{height:100vh;min-height:100vh}
+  .app-shell{height:100vh}
 }
 
 
