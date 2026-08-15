@@ -1,0 +1,42 @@
+name: BTR Sitter UI Restore
+on:
+  push:
+    branches:
+      - btr-sitter-ui-restore-20260815
+    paths:
+      - .github/workflows/btr-sitter-ui-restore.yml
+permissions:
+  contents: write
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: btr-sitter-ui-restore-20260815
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply restored sitter UI
+        run: python .github/restore-sitter-ui.py
+      - name: Syntax and regression
+        run: |
+          node --check sitter-mode.js
+          node --check shared-care.js
+          node --check app.js
+          npm test
+      - name: Verify scope
+        run: |
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' index.html sitter-mode.js styles.css sw.js tests/regression.mjs | sort)"
+          printf 'Changed files:\n%s\n' "$changed"
+          test "$changed" = "$expected"
+      - name: Commit isolated restoration
+        run: |
+          git config user.name "BTR Sitter UI Restore"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html sitter-mode.js styles.css sw.js tests/regression.mjs
+          git commit -m "Restore Sitter Mode popup flow"
+          git push origin HEAD:btr-sitter-ui-restore-20260815
